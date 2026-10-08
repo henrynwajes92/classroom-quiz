@@ -31,6 +31,12 @@ is the normal end of a stream. The shared demo server only keeps up with ~1
 `en_us-gen2` / ~4 `en_us-gen1-16khz` real-time streams, so use it for
 development at low concurrency only.
 
+## Plan
+
+`PLAN.md` holds the agreed stack (Python FastAPI server + plain web pages),
+architecture, milestones and the issue list. Follow it; update it when a
+decision changes.
+
 ## Architecture (planned, update as it firms up)
 
 - **Game server**: rooms, questions, scoring, leaderboard; pushes updates to clients.
