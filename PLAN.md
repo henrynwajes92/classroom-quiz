@@ -47,6 +47,24 @@ load run tests the whole system, not just the API.
 6. Leaderboard update is broadcast to everyone.
 7. After a time limit, unused streams are closed and the round ends.
 
+## Audio format (decided by CQ-2)
+
+Phones and the simulator send **raw 16 kHz mono 16-bit signed little-endian
+PCM**. The server forwards it to Transcribe with this config:
+
+```json
+{"config": {"model_id": "en_us-gen1-16khz", "audio_format_raw": {
+  "encoding": "AUDIO_ENCODING_SIGNED", "bit_depth": 16,
+  "byte_order": "BYTE_ORDER_LITTLE_ENDIAN", "sample_rate": 16000, "channels": 1}}}
+```
+
+Measured on the demo server, one stream, 1.7 s answer, real-time pacing:
+answer latency 0.23–0.30 s for raw and WAV alike; connection setup 1.0–2.9 s
+(so streams open at question start). A WAV header with unknown length
+followed by streamed PCM does **not** work (`wav: unexpected EOF`).
+Field names: `RecognitionConfig.audio_format_raw` / `AudioFormatRAW` in
+`proto/cobaltspeech/transcribe/v5/transcribe.proto` (branch `master`).
+
 ## Scoring
 
 - Each question has a list of accepted answers (`"paris"`, `"paris france"`).
@@ -87,7 +105,7 @@ useful thing to show customers.
 |---|---|---|
 | No dedicated instance from ops | Demo server keeps up with ~4 streams | Ask today; build on demo server meanwhile |
 | Phone mic needs HTTPS | Browsers block the microphone on plain `http://` LAN addresses | Serve over HTTPS via a tunnel (e.g. cloudflared) or a local certificate; test on a phone in Day 1 |
-| Raw PCM format untested | The guide only tested WAV files; phones produce raw PCM | Spike `audio_format_raw` first; fall back to a WAV header if it fails |
+| ~~Raw PCM format untested~~ | Resolved by CQ-2: raw PCM works, same latency as WAV | See "Audio format" |
 | iPhone Safari audio quirks | Sample rate and permission behaviour differ | Resample to 16 kHz in the page; test on iOS and Android |
 | Venue Wi-Fi | 35 streams over one network | Simulator runs from a laptop on wired/stable network; phones only add 5 |
 
