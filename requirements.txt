@@ -1,0 +1,12 @@
+# Game server
+fastapi==0.143.0
+uvicorn==0.54.0
+websockets==17.2
+
+# scripts/ (Transcribe streaming test, VoiceGen clips)
+certifi==2026.7.22
+requests==2.34.2
+
+# Tests (httpx2 is what starlette's TestClient wants now)
+pytest==9.1.1
+httpx2==2.13.1

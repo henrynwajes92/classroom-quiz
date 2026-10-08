@@ -47,4 +47,19 @@ decision changes.
 
 ## Commands
 
-_TBD once the stack is chosen._
+Run from the repo root (in WSL), using the venv:
+
+```sh
+# install
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+
+# run the game server (host: ws://<ip>:8000/ws/host, players: /ws/play)
+.venv/bin/uvicorn server.app:app --host 0.0.0.0 --port 8000
+
+# tests (no Cobalt calls)
+.venv/bin/python -m pytest -q
+```
+
+Server settings (env vars): `TRANSCRIBE_URL`, `TRANSCRIBE_MODEL`,
+`QUESTIONS_FILE` (default `questions/general.json`), `ROUND_SECONDS`
+(default 20). The client/server message contract is `docs/protocol.md`.
