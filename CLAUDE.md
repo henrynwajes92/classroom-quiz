@@ -56,10 +56,24 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # run the game server (host: ws://<ip>:8000/ws/host, players: /ws/play)
 .venv/bin/uvicorn server.app:app --host 0.0.0.0 --port 8000
 
-# tests (no Cobalt calls)
+# tests (no Cobalt calls; Transcribe is faked by a local WebSocket server)
 .venv/bin/python -m pytest -q
+
+# live check through the game server against Transcribe: one round with 1
+# player, then one with 3 (each player = 1 stream; keep it <= 4 on the demo server).
+# The clip says just "Paris": placeholder scoring (until CQ-7) is exact match,
+# so clips/paris.wav ("The answer is Paris") is transcribed right but scored wrong.
+.venv/bin/python scripts/play_clip.py --players 1,3 clips/france-capital/00_cobalt_steve.wav
 ```
 
 Server settings (env vars): `TRANSCRIBE_URL`, `TRANSCRIBE_MODEL`,
 `QUESTIONS_FILE` (default `questions/general.json`), `ROUND_SECONDS`
-(default 20). The client/server message contract is `docs/protocol.md`.
+(default 20), `BRIDGE` (`transcribe`, the default, or `logging` for no
+recognition), `ALLOW_DEMO_LOAD` (set to `1` to lift the bridge's cap of 4
+concurrent streams when `TRANSCRIBE_URL` is the demo server; beyond the cap a
+stream waits up to 10 s for a free slot, then the answer gets a
+`transcribe_unavailable` final. Only with ops' go-ahead),
+`FINAL_QUIET_GAP` (default 0.5: seconds of no new result after a final
+before the answer is scored, instead of waiting ~2 s for Transcribe to close
+the stream). The
+client/server message contract is `docs/protocol.md`.

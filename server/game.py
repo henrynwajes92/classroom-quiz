@@ -317,10 +317,16 @@ class Room:
         if rnd is self.round and player.id in self.players:
             player.client.send({"type": "partial", "round": rnd.number, "text": text})
 
-    def on_final(self, rnd: Round, player: Player, text: str):
+    def on_final(self, rnd: Round, player: Player, text: str, error: str | None = None):
         """Score a final transcript for ``rnd``. Accepted until the next question
         starts, so answers given just before the timer still count when
-        Transcribe is slow; finals for older rounds are dropped."""
+        Transcribe is slow; finals for older rounds are dropped.
+
+        ``error`` (e.g. "transcribe_timeout") means recognition failed; ``text``
+        is then whatever was recognised, usually "". Such an answer is not
+        scored (0 points, correct false), since part of it may be missing. The
+        error is passed on to the clients so a phone can say "couldn't hear
+        you" rather than "wrong"."""
         if rnd is not self.round:
             log.info("room %s: dropping final for old round %d from %s", self.code, rnd.number, player.name)
             return
@@ -329,11 +335,16 @@ class Room:
             return
         answer.transcript = text
         answer.final_at = rnd.elapsed()
-        answer.correct, answer.points = scoring.score(rnd.question, text, answer.final_at, rnd.time_limit)
+        if error:
+            answer.correct, answer.points = False, 0
+        else:
+            answer.correct, answer.points = scoring.score(rnd.question, text, answer.final_at, rnd.time_limit)
         player.score += answer.points
         final = {"type": "final", "round": rnd.number, "player_id": player.id, "name": player.name,
                  "text": text, "correct": answer.correct, "points": answer.points,
                  "score": player.score}
+        if error:
+            final["error"] = error
         player.client.send(final)
         self.host.send(final)
         self.to_everyone(self.leaderboard_msg())

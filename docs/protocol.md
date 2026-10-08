@@ -5,8 +5,6 @@ page, the host screen and the simulator. The simulator speaks exactly the
 player protocol, same as a phone.
 
 Status markers:
-- **CQ-4**: sent only once the Transcribe bridge exists. Until then the
-  server accepts audio but never sends `partial` or `final`.
 - **CQ-7**: scoring is a placeholder (exact match, flat 100 points) until
   CQ-7. Message shapes stay the same; only the numbers change.
 
@@ -41,8 +39,8 @@ host                      server                        player(s)
  |                           |<----------- hold_start ------|
  |                           |<----------- audio (xN) ------|
  |                           |<----------- hold_end --------|
- |                           |------------ partial (CQ-4) ->|
- |<---------- final (CQ-4) --|------------ final (CQ-4) --->|
+ |                           |------------ partial -------->|   while speaking
+ |<---------------- final ---|------------ final ---------->|   ~1 s after hold_end
  |<------------- leaderboard-|------------ leaderboard ---->|
  |-- end_round (optional) -->|                              |   or time runs out
  |<--------------- round_end-|------------ round_end ------>|
@@ -116,8 +114,11 @@ chunk; that error can be ignored).
 Errors: `no_round`, `not_holding`, `audio_too_large`, `bad_message`
 (empty chunk or invalid base64).
 
-Until CQ-4 the server only counts and logs the bytes. From CQ-4 it forwards
-each chunk to the player's Transcribe stream.
+The server forwards each chunk to the player's Transcribe stream, which it
+opens when the question starts. Connecting takes 1–3 s, up to ~4 s with
+several streams on the demo server. Chunks that arrive before that stream
+is connected are held and sent in order once it is, so a player can start
+speaking straight away (their `final` then comes later; see `final`).
 
 ### `hold_end`
 Player released the button: the answer is complete.
@@ -195,24 +196,62 @@ The accepted answers are **not** sent.
 `round` counts up from 1 per room. Clients should count down from
 `remaining` using their own clock.
 
-### `partial` (→ that player) — CQ-4
+### `partial` (→ that player)
 Interim transcript of the player's own answer, to show on the phone while
-they speak. May arrive many times; each replaces the previous one.
+they speak. May arrive many times; each replaces the previous one (it
+already includes any earlier finished phrases of the same answer).
 
 ```json
 {"type": "partial", "round": 1, "text": "par"}
 ```
 
-### `final` (→ that player and host) — CQ-4, scoring CQ-7
-Final transcript of one answer, with its score. At most one per player per
-round.
+### `final` (→ that player and host) — scoring CQ-7
+Final transcript of one answer, with its score. Exactly one per answer
+(per `hold_start`), unless the player leaves or the next question starts
+first.
 
 ```json
 {"type": "final", "round": 1, "player_id": "p7", "name": "Alice",
  "text": "Paris.", "correct": true, "points": 100, "score": 300}
 ```
 `points` is for this answer; `score` is the player's new total and already
-includes `points`.
+includes `points`. `text` is the whole answer: if the player paused
+("Um." … "Paris."), the phrases are joined ("Um. Paris.").
+
+Timing: sent once Transcribe has a final result for the end of the answer
+and nothing more has come for 0.5 s (`FINAL_QUIET_GAP`), or when Transcribe
+closes the stream if that is sooner, and at most 10 s after `hold_end`. A
+phrase recognised after that is not added. How soon depends on whether the
+player's stream was connected when they started speaking:
+- connected (the player waited a few seconds into the question): about
+  0.75–1 s after `hold_end` on the demo server (≈0.25 s recognition + the
+  0.5 s quiet gap);
+- still connecting (the player spoke within the first 1–4 s): the audio
+  held meanwhile is sent in a burst when the stream connects, so the
+  `final` can take a second or two longer.
+
+Recognition worked, `"error"` absent: `text` is what was heard and the
+answer is scored. That includes hearing nothing (`"text": ""`), and a
+timeout after some phrases were recognised (`text` has those phrases, no
+`error`, scored as usual).
+
+Recognition failed, `"error"` present: the answer is **not scored**
+(`correct: false`, `points: 0`), because part of it may be missing. `text`
+is whatever was recognised before the failure, usually `""` (e.g. the stream
+dropped after "Um." gives `"text": "Um."` with `transcribe_error`). The phone
+can show "couldn't hear you" rather than "wrong":
+
+```json
+{"type": "final", "round": 1, "player_id": "p7", "name": "Alice",
+ "text": "", "correct": false, "points": 0, "score": 200,
+ "error": "transcribe_unavailable"}
+```
+
+| `error` | Meaning |
+|---|---|
+| `transcribe_unavailable` | No Transcribe stream: connecting failed, or the demo server's cap of 4 streams stayed full for 10 s |
+| `transcribe_error` | Transcribe returned an error, closed the stream before the end of the answer's audio, closed it with an error code (anything but 1000/1006), or sending audio failed |
+| `transcribe_timeout` | Nothing recognised within 10 s of `hold_end` |
 
 ### `leaderboard` (→ host and all players)
 Full ranking, highest score first (ties by name). Sent after each `final`
@@ -230,8 +269,8 @@ and after each `round_end`.
 `answer` is the main accepted answer, to reveal. `results` has one entry per
 player still in the room who pressed hold this round, and `answered` is its
 length; `players` is the number of players in the room. `transcript`/`correct`
-are `null` while no final has arrived (always, until CQ-4); a late final is
-sent separately as `final` + `leaderboard`.
+are `null` while no final has arrived (usual for answers released in the
+last ~1 s); a late final is sent separately as `final` + `leaderboard`.
 
 ```json
 {"type": "round_end", "round": 1, "question_id": "france-capital",
@@ -271,15 +310,19 @@ The host disconnected. The server closes the player sockets right after
 | `round_in_progress` | `start_question` while a round is open |
 | `internal_error` | Server bug while handling the message; logged on the server |
 
-## Server side: where Transcribe plugs in (CQ-4)
+## Server side: where Transcribe plugs in
 
 `server/bridge.py` defines the hooks the room calls: `question_started`,
 `hold_start`, `audio`, `hold_end`, `round_ended`, `player_left`. Each
 answer hook gets the round it belongs to (`rnd`), and `hold_end` is called
 exactly once per `hold_start` (by the player's release or by the round
 ending). The bridge reports results with `room.on_partial(rnd, player, text)`
-and `room.on_final(rnd, player, text)`, which produce the `partial`, `final`
-and `leaderboard` messages above; results for a round that is no longer the
-current one are dropped. Hook exceptions are logged and never reach clients.
-Clients don't see the bridge; the protocol stays the same when it is
-swapped in.
+and `room.on_final(rnd, player, text, error=None)`, which produce the
+`partial`, `final` and `leaderboard` messages above; results for a round
+that is no longer the current one are dropped. Hook exceptions are logged
+and never reach clients.
+
+`server/transcribe_bridge.py` (`TranscribeBridge`, the default) opens one
+Transcribe stream per player per question; `BRIDGE=logging` swaps in
+`LoggingBridge`, which never sends `partial` or `final`. Clients don't see
+the bridge otherwise.

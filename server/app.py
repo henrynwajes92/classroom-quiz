@@ -12,11 +12,13 @@ import binascii
 import json
 import logging
 import math
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket
 
 from . import config
 from .bridge import Bridge, LoggingBridge
+from .transcribe_bridge import TranscribeBridge
 from .game import Client, GameError, Lobby, Player, Room
 from .questions import Question, load_questions
 
@@ -62,11 +64,26 @@ def valid_time_limit(value) -> bool:
             and config.MIN_TIME_LIMIT <= value <= config.MAX_TIME_LIMIT)
 
 
+def default_bridge() -> Bridge:
+    """The bridge picked by the BRIDGE env var."""
+    if config.BRIDGE == "logging":
+        return LoggingBridge()
+    if config.BRIDGE == "transcribe":
+        return TranscribeBridge()
+    raise ValueError(f"BRIDGE must be 'transcribe' or 'logging', not {config.BRIDGE!r}")
+
+
 def create_app(questions: list[Question] | None = None, bridge: Bridge | None = None,
                round_seconds: float | None = None) -> FastAPI:
-    app = FastAPI(title="Classroom quiz")
-    lobby = Lobby(questions or load_questions(config.QUESTIONS_FILE),
-                  bridge or LoggingBridge(),
+    bridge = bridge or default_bridge()
+
+    @asynccontextmanager
+    async def lifespan(app):
+        yield
+        await bridge.aclose()  # no Transcribe streams left open on shutdown
+
+    app = FastAPI(title="Classroom quiz", lifespan=lifespan)
+    lobby = Lobby(questions or load_questions(config.QUESTIONS_FILE), bridge,
                   round_seconds or config.ROUND_SECONDS)
     app.state.lobby = lobby
 
