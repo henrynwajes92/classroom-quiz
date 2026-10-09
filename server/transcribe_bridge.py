@@ -275,6 +275,7 @@ class Stream:
         self.trigger: str | None = None     # what _finish would report as
         self.slot = False      # holds a slot of bridge.limit
         self._quiet: asyncio.TimerHandle | None = None  # quiet-gap timer
+        self._ending = False   # end of audio being sent (a reply can arrive before the send returns)
         self.deadline: float | None = None  # loop time; set by hold_end
         self._timeout: asyncio.Timeout | None = None
         self.task = asyncio.create_task(self.run(), name=f"transcribe {room.code} r{rnd.number} {player.id}")
@@ -397,6 +398,7 @@ class Stream:
             while True:
                 chunk = await self.queue.get()
                 if chunk is None:
+                    self._ending = True
                     await ws.send(END_OF_AUDIO)
                     self.m.end_sent = time.monotonic()
                     return
@@ -439,7 +441,7 @@ class Stream:
                         self.finals.append(text)
                 # The quiet gap starts at the first non-empty final after the end
                 # of audio; every later result (more speech) restarts it.
-                if self.m.end_sent is not None and (self._quiet is not None or (not partial and text)):
+                if self._ending and (self._quiet is not None or (not partial and text)):
                     self._arm_quiet()
         except websockets.ConnectionClosed:
             pass  # _stream checks the close code

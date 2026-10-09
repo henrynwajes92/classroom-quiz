@@ -107,8 +107,10 @@ def test_four_players_complete_a_round(server, manifest, tmp_path, capsys):
         assert a["points"] > 0 and 0 <= a["delay_s"] <= 0.2 and a["audio_s"] == 0.3
         assert a["stream_likely_ready"] is False and not a["cut_off"]
     assert sorted(bridge.audio_bytes.values()) == [RIGHT] * 4
-    for key, t in bridge.ended.items():  # paced in real time: 0.3 s clip
-        assert 0.25 <= t - bridge.first_chunk[key] <= 0.5, key
+    # Paced in real time: a 0.3 s clip takes at least ~0.3 s (never sent faster).
+    # Loose upper bound: a busy test machine can stall the loop (seen 1.2 s).
+    for key, t in bridge.ended.items():
+        assert 0.25 <= t - bridge.first_chunk[key] <= 2.0, key
     assert res["rounds"][0]["reason"] == "host"  # ended as soon as all had answered
     assert "ALL" in capsys.readouterr().out
 
