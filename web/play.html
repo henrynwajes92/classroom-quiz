@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14213d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Classroom Quiz</title>
+<link rel="stylesheet" href="/static/play.css">
+</head>
+<body>
+<header id="bar" hidden>
+  <span id="bar-room"></span>
+  <span id="bar-name"></span>
+  <span id="bar-score">0 pts</span>
+</header>
+
+<main>
+  <!-- Not a secure context: no microphone. -->
+  <p id="insecure" class="banner warn" hidden>
+    The microphone only works over a secure (<b>https://</b>) link.
+    Ask for the https link to this game and open that instead.
+  </p>
+
+  <!-- Join -->
+  <section id="screen-join" class="screen">
+    <h1>Classroom Quiz</h1>
+    <form id="join-form" autocomplete="off">
+      <label for="room">Room code</label>
+      <input id="room" name="room" value="__ROOM__" maxlength="4" inputmode="text" autocapitalize="characters"
+             spellcheck="false" placeholder="ABCD" required>
+      <label for="name">Your name</label>
+      <input id="name" name="name" maxlength="24" autocapitalize="words" spellcheck="false"
+             placeholder="Alice" required>
+      <p id="join-error" class="error" role="alert" hidden></p>
+      <button id="join-btn" type="submit" class="primary">Join</button>
+      <p class="small">Joining asks for the microphone: you answer out loud.</p>
+    </form>
+  </section>
+
+  <!-- Waiting for the next question (also between rounds) -->
+  <section id="screen-wait" class="screen" hidden>
+    <h2 id="wait-title">You're in!</h2>
+    <p id="wait-text">Waiting for the next question…</p>
+  </section>
+
+  <!-- Question open -->
+  <section id="screen-question" class="screen" hidden>
+    <div class="qmeta"><span id="q-num"></span><span id="q-timer" class="timer"></span></div>
+    <div class="timebar"><div id="q-timebar"></div></div>
+    <h2 id="q-text"></h2>
+    <p id="q-hint" class="hint"></p>
+    <p id="q-status" class="status" aria-live="polite"></p>
+    <p id="q-transcript" class="transcript" aria-live="polite"></p>
+  </section>
+
+  <!-- Your result for the round -->
+  <section id="screen-result" class="screen" hidden>
+    <p id="r-verdict" class="verdict"></p>
+    <p id="r-points" class="points"></p>
+    <p class="small">You said</p>
+    <p id="r-transcript" class="transcript"></p>
+    <p id="r-answer" class="answer" hidden></p>
+  </section>
+
+  <!-- Disconnected / room closed -->
+  <section id="screen-gone" class="screen" hidden>
+    <h2 id="gone-title">Disconnected</h2>
+    <p id="gone-text"></p>
+    <button id="rejoin-btn" type="button" class="primary">Rejoin</button>
+    <button id="newroom-btn" type="button" class="secondary">Join another room</button>
+  </section>
+
+  <!-- Leaderboard: shown on the wait and result screens -->
+  <section id="board" hidden>
+    <p id="board-me" class="me"></p>
+    <ol id="board-list"></ol>
+  </section>
+
+  <p id="toast" class="toast" role="status" hidden></p>
+</main>
+
+<!-- In thumb reach at the bottom of the screen -->
+<footer id="hold-area" hidden>
+  <button id="hold" type="button" class="off" aria-disabled="true">
+    <span id="hold-label">Hold to answer</span>
+  </button>
+</footer>
+
+<script src="/static/capture-worklet.js"></script>
+<script src="/static/play.js"></script>
+</body>
+</html>

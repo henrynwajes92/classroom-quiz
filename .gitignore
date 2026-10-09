@@ -3,3 +3,6 @@ __pycache__/
 .pytest_cache/
 .env
 clips/
+# scripts/tunnel.sh: downloaded cloudflared, current tunnel URL
+tools/
+.tunnel_url

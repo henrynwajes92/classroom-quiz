@@ -4,6 +4,8 @@
 
 /ws/host  one per room; connecting creates the room
 /ws/play  players (phones and simulator); first message must be "join"
+/, /play  the phone page (web/play.html); /play?room=KXQB pre-fills the room
+/static/  the phone page's JS/CSS (web/)
 
 The message contract is in docs/protocol.md.
 """
@@ -12,9 +14,12 @@ import binascii
 import json
 import logging
 import math
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from . import config
 from .bridge import Bridge, LoggingBridge
@@ -23,6 +28,26 @@ from .game import Client, GameError, Lobby, Player, Room
 from .questions import Question, load_questions
 
 log = logging.getLogger("quiz.app")
+
+WEB_DIR = config.ROOT / "web"
+# No caching: phones should pick up page fixes on reload during the hackathon.
+NO_CACHE = {"Cache-Control": "no-cache"}
+
+
+def phone_page(room: str | None) -> str:
+    """web/play.html with the room field pre-filled. Only a 4-letter code is
+    used (anything else is dropped), so nothing from the URL reaches the HTML."""
+    room = (room or "").strip().upper()
+    if not re.fullmatch(r"[A-Z]{4}", room):
+        room = ""
+    return (WEB_DIR / "play.html").read_text(encoding="utf-8").replace("__ROOM__", room)
+
+
+class NoCacheStatic(StaticFiles):
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers.update(NO_CACHE)
+        return response
 
 
 async def serve(ws: WebSocket, client: Client, on_message, on_binary=None):
@@ -92,6 +117,13 @@ def create_app(questions: list[Question] | None = None, bridge: Bridge | None = 
         return {"ok": True, "rooms": len(lobby.rooms),
                 "players": sum(len(r.players) for r in lobby.rooms.values()),
                 "transcribe": bridge.status()}  # the simulator's demo-server check reads this
+
+    @app.get("/", response_class=HTMLResponse)
+    @app.get("/play", response_class=HTMLResponse)
+    async def play_page(room: str | None = None):
+        return HTMLResponse(phone_page(room), headers=NO_CACHE)
+
+    app.mount("/static", NoCacheStatic(directory=WEB_DIR), name="static")
 
     @app.websocket("/ws/host")
     async def host_ws(ws: WebSocket):
