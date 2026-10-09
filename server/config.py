@@ -17,6 +17,9 @@ ALLOW_DEMO_LOAD = os.environ.get("ALLOW_DEMO_LOAD") == "1"
 # Seconds without a new result, after a final for the end of the answer, before
 # the answer counts as complete (Transcribe itself only closes the stream ~2 s later).
 FINAL_QUIET_GAP = float(os.environ.get("FINAL_QUIET_GAP", "0.5"))
+# RECOGNITION_CONTEXT=1: send each question's accepted answers to Transcribe as
+# recognition context (gen1 models only; see server/transcribe_bridge.py).
+RECOGNITION_CONTEXT = os.environ.get("RECOGNITION_CONTEXT") == "1"
 
 QUESTIONS_FILE = Path(os.environ.get("QUESTIONS_FILE", ROOT / "questions" / "general.json"))
 ROUND_SECONDS = float(os.environ.get("ROUND_SECONDS", "20"))

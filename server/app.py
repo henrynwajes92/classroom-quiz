@@ -90,7 +90,8 @@ def create_app(questions: list[Question] | None = None, bridge: Bridge | None = 
     @app.get("/health")
     async def health():
         return {"ok": True, "rooms": len(lobby.rooms),
-                "players": sum(len(r.players) for r in lobby.rooms.values())}
+                "players": sum(len(r.players) for r in lobby.rooms.values()),
+                "transcribe": bridge.status()}  # the simulator's demo-server check reads this
 
     @app.websocket("/ws/host")
     async def host_ws(ws: WebSocket):

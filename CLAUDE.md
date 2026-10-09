@@ -61,9 +61,23 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 # live check through the game server against Transcribe: one round with 1
 # player, then one with 3 (each player = 1 stream; keep it <= 4 on the demo server).
-# The clip says just "Paris": placeholder scoring (until CQ-7) is exact match,
-# so clips/paris.wav ("The answer is Paris") is transcribed right but scored wrong.
 .venv/bin/python scripts/play_clip.py --players 1,3 clips/france-capital/00_cobalt_steve.wav
+
+# scorer check of the clip texts (no network): correct clips must score right, wrong ones wrong
+.venv/bin/python scripts/make_clips.py --check
+
+# one clip with/without recognition context (gen1 only; 1 stream)
+.venv/bin/python scripts/transcribe_file.py clips/largest-ocean/04_LTTS_251.wav en_us-gen1-16khz --raw --context=pacific,the\ pacific
+
+# simulator: N fake players over /ws/play, streaming clips/manifest.json clips
+# (random 0-2 s delay, voices spread, --correct-rate 0.75). Against a running
+# server: --room KXQB joins an existing room; --host creates one and runs
+# --rounds questions. Refuses > 4 players when the server's /health says it
+# uses the demo server (or, if it can't say, while TRANSCRIBE_URL is or may be
+# the demo server) unless --i-asked-ops; the server's own cap of 4 streams
+# still applies unless it runs with ALLOW_DEMO_LOAD=1. Wrap live runs in
+# `flock /tmp/cobalt_demo.lock` so agents don't overlap on the demo server.
+.venv/bin/python scripts/simulate.py --players 4 --host --rounds 2 --server ws://localhost:8000 --out results.json
 ```
 
 Server settings (env vars): `TRANSCRIBE_URL`, `TRANSCRIBE_MODEL`,
@@ -75,5 +89,8 @@ stream waits up to 10 s for a free slot, then the answer gets a
 `transcribe_unavailable` final. Only with ops' go-ahead),
 `FINAL_QUIET_GAP` (default 0.5: seconds of no new result after a final
 before the answer is scored, instead of waiting ~2 s for Transcribe to close
-the stream). The
-client/server message contract is `docs/protocol.md`.
+the stream), `RECOGNITION_CONTEXT` (set to `1` to compile each question's
+accepted answers with Transcribe's CompileContext and send them as recognition
+context; gen1 models only; off by default). The
+client/server message contract is `docs/protocol.md`. Scoring rules and the
+points formula are in the `server/scoring.py` docstring.

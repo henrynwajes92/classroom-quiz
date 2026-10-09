@@ -41,7 +41,7 @@ Manifest `clips/manifest.json` is a JSON list, one object per clip:
 Each run also checks the spoken text against `server.scoring`: wrong clips
 must score wrong; correct clips' bare answers must score correct. Correct
 clips with a phrasing ("The answer is ...") are listed if the scorer does not
-accept the full text yet (filler stripping is CQ-7).
+accept the full text (since CQ-7's filler stripping, all are accepted).
 """
 import argparse
 import json

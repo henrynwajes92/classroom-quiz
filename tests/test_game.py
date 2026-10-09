@@ -204,6 +204,63 @@ def test_late_final_from_previous_round_is_dropped():
         assert (final["round"], final["text"], final["correct"], final["score"]) == (2, "Mars.", True, 100)
 
 
+def test_four_player_round_leaderboard():
+    """4 players answer; each final is scored for speed and followed by a
+    leaderboard to everyone; round_end ends with the final ranking."""
+    bridge = ManualBridge()
+    with make_client(bridge) as client:
+        h, room = host(client)
+        names = ["Alice", "Bob", "Cara", "Dave"]
+        players = {n: join(client, room, n)[0] for n in names}
+        game = client.app.state.lobby.rooms[room]
+        h.send_json({"type": "start_question"})
+        for ws in [h, *players.values()]:
+            assert expect(ws, "question")["hint"].startswith("Answer in a few words")
+        for ws in players.values():
+            ws.send_json({"type": "hold_start"})
+            ws.send_json({"type": "hold_end"})
+            sync(ws)
+        ended = {p.name: (rnd, p) for rnd, p, _ in bridge.ended}
+
+        async def deliver(name, text, at):  # final result `at` seconds into the question
+            rnd, player = ended[name]
+            rnd.started_at = asyncio.get_running_loop().time() - at
+            game.on_final(rnd, player, text)
+
+        # (transcript, seconds) -> points: 50 + 50 * (1 - seconds / 30)
+        script = [("Bob", "The answer's Paris. I think.", 2, 97), ("Cara", "London.", 4, 0),
+                  ("Dave", "pairs", 6, 90), ("Alice", "Um. Paris.", 12, 80)]
+        for name, text, at, points in script:
+            client.portal.call(deliver, name, text, at)
+            final = expect(players[name], "final")
+            assert (final["text"], final["points"], final["correct"]) == (text, points, points > 0)
+            assert expect(h, "final")["name"] == name
+            for ws in [h, *players.values()]:  # every client: a leaderboard right after the final
+                board = ws.receive_json() if ws in (h, players[name]) else expect(ws, "leaderboard")
+                assert board["type"] == "leaderboard" and board["round"] == 1
+        assert [(p["name"], p["score"], p["rank"], p["round_points"]) for p in board["players"]] == [
+            ("Bob", 97, 1, 97), ("Dave", 90, 2, 90), ("Alice", 80, 3, 80), ("Cara", 0, 4, 0)]
+
+        h.send_json({"type": "end_round"})
+        for ws in [h, *players.values()]:
+            end = expect(ws, "round_end")
+            assert end["answered"] == 4 and {r["name"]: r["correct"] for r in end["results"]} == {
+                "Alice": True, "Bob": True, "Cara": False, "Dave": True}
+            assert [p["name"] for p in expect(ws, "leaderboard")["players"]] == ["Bob", "Dave", "Alice", "Cara"]
+
+
+def test_leaderboard_ties_share_a_rank(client):
+    h, room = host(client)
+    for n in ("Bob", "alice", "Cara"):
+        join(client, room, n)
+    game = client.app.state.lobby.rooms[room]
+    for p, s in zip(game.players.values(), (50, 50, 20)):
+        p.score = s
+    board = game.leaderboard_msg()
+    assert [(p["name"], p["rank"]) for p in board["players"]] == [("alice", 1), ("Bob", 1), ("Cara", 3)]
+    assert board["round"] is None and all(p["round_points"] == 0 for p in board["players"])
+
+
 def test_empty_audio_is_rejected(client, bridge):
     h, room = host(client)
     alice, _ = join(client, room, "Alice")

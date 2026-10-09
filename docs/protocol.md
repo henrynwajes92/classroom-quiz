@@ -4,9 +4,18 @@ The contract between the game server (`server/`) and its clients: the phone
 page, the host screen and the simulator. The simulator speaks exactly the
 player protocol, same as a phone.
 
-Status markers:
-- **CQ-7**: scoring is a placeholder (exact match, flat 100 points) until
-  CQ-7. Message shapes stay the same; only the numbers change.
+Scoring (CQ-7, `server/scoring.py`): the transcript is normalised (lowercase,
+no punctuation, no fillers such as "um", "the answer is", "I think it's",
+"that's", "I'd say", trailing "I think", and a leading "the"/"a"/"an"), then
+matched against the accepted answers: exact, else word by word, where every
+word must equal the answer's word or be a near miss of it. Near misses: only
+for answer words of 5+ letters, at most 1 edit (2 for 8+ letters), same first
+letter (and last letter, under 8 letters), and never for numbers. So
+"pairs" counts for Paris, but "6 legs", "planet Earth" or "money" (honey)
+don't. A correct answer scores `round(50 + 50 * (1 - t / time_limit))`,
+clamped to 50-100, where `t` = seconds from question start until the answer
+is reported (Transcribe's final + the 0.5 s quiet gap, see `final`); wrong
+or unrecognised answers score 0.
 
 ## Connections
 
@@ -191,10 +200,14 @@ The accepted answers are **not** sent.
 ```json
 {"type": "question", "round": 1, "question_id": "france-capital",
  "index": 0, "total": 12, "text": "What is the capital of France?",
+ "hint": "Answer in a few words, e.g. \"It's the Pacific\"",
  "time_limit": 20.0, "remaining": 20.0}
 ```
 `round` counts up from 1 per room. Clients should count down from
-`remaining` using their own clock.
+`remaining` using their own clock. `hint` is for the phone to show under the
+question: recognition often mishears a bare short word ("eight" as "A"), much
+less a short phrase. A question in the question file may set its own `hint`
+(e.g. so the example doesn't give the answer away).
 
 ### `partial` (→ that player)
 Interim transcript of the player's own answer, to show on the phone while
@@ -205,16 +218,17 @@ already includes any earlier finished phrases of the same answer).
 {"type": "partial", "round": 1, "text": "par"}
 ```
 
-### `final` (→ that player and host) — scoring CQ-7
+### `final` (→ that player and host)
 Final transcript of one answer, with its score. Exactly one per answer
 (per `hold_start`), unless the player leaves or the next question starts
 first.
 
 ```json
 {"type": "final", "round": 1, "player_id": "p7", "name": "Alice",
- "text": "Paris.", "correct": true, "points": 100, "score": 300}
+ "text": "I think it's Paris.", "correct": true, "points": 88, "score": 263}
 ```
-`points` is for this answer; `score` is the player's new total and already
+`points` is for this answer (50-100 if correct, faster is more; see
+"Scoring" at the top); `score` is the player's new total and already
 includes `points`. `text` is the whole answer: if the player paused
 ("Um." … "Paris."), the phrases are joined ("Um. Paris.").
 
@@ -254,15 +268,21 @@ can show "couldn't hear you" rather than "wrong":
 | `transcribe_timeout` | Nothing recognised within 10 s of `hold_end` |
 
 ### `leaderboard` (→ host and all players)
-Full ranking, highest score first (ties by name). Sent after each `final`
-and after each `round_end`.
+Full ranking, highest score first (ties by name). Sent right after each
+`final` (in the same step, so it follows the final at once: the final itself
+comes `FINAL_QUIET_GAP`, 0.5 s, after Transcribe's last result), after each
+`round_end`, and when a player leaves.
 
 ```json
-{"type": "leaderboard", "players": [
-  {"player_id": "p7", "name": "Alice", "score": 300},
-  {"player_id": "p2", "name": "Bob", "score": 200}
+{"type": "leaderboard", "round": 3, "players": [
+  {"player_id": "p7", "name": "Alice", "score": 263, "rank": 1, "round_points": 88},
+  {"player_id": "p2", "name": "Bob", "score": 200, "rank": 2, "round_points": 0},
+  {"player_id": "p9", "name": "Cara", "score": 200, "rank": 2, "round_points": 95}
 ]}
 ```
+`rank` starts at 1; equal scores share a rank (1, 2, 2, 4). `round` is the
+current (or last finished) round, `null` before the first; `round_points` is
+what the player has scored in it so far (0 if not answered or not scored yet).
 
 ### `round_end` (→ host and all players)
 `reason`: `"timeout"`, `"host"` (host sent `end_round`) or `"host_left"`.
@@ -325,4 +345,5 @@ and never reach clients.
 `server/transcribe_bridge.py` (`TranscribeBridge`, the default) opens one
 Transcribe stream per player per question; `BRIDGE=logging` swaps in
 `LoggingBridge`, which never sends `partial` or `final`. Clients don't see
-the bridge otherwise.
+the bridge otherwise. With `RECOGNITION_CONTEXT=1` the bridge also sends each
+question's accepted answers to Transcribe as recognition context (gen1 only).

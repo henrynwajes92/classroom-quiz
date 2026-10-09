@@ -44,6 +44,19 @@ refused: logged, recorded as ``refused``, and the player's answer gets
 gives its slot back at once, while its socket is still closing (at most
 ``CLOSE_TIMEOUT``). ``ALLOW_DEMO_LOAD=1`` lifts the cap.
 
+Recognition context (``RECOGNITION_CONTEXT=1``, off by default): at
+``question_started`` the bridge compiles the question's accepted answers once
+with Transcribe's CompileContext (HTTP POST ``.../compile-context`` next to
+the streaming URL, token ``unk:default``; cached per question) and every
+stream sends it in its config as ``context.compiled``. Compiling runs while
+the streams connect; a stream waits at most ``CONTEXT_TIMEOUT`` for it. If
+compiling fails or is too slow, streams go ahead without context, and after
+the first failure they never wait for a compile again (retried when the
+question next starts); after ``CONTEXT_MAX_FAILURES`` failures the bridge
+stops using context. Only gen1 models support it: for any other model id the
+setting is ignored (with a warning). On the demo server's gen1 model this
+turned "Civic" into "Pacific" and "No" into "Nile" for bare answers.
+
 ``bridge.metrics`` holds one ``StreamMetrics`` per stream, for CQ-10.
 """
 import asyncio
@@ -56,6 +69,7 @@ from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
 import certifi
+import requests
 import websockets
 
 from . import config
@@ -66,6 +80,9 @@ log = logging.getLogger("quiz.transcribe")
 FINAL_TIMEOUT = 10.0    # seconds after hold_end to wait for the stream to finish
 CONNECT_TIMEOUT = 10.0  # also the longest wait for a free slot under the demo cap
 CLOSE_TIMEOUT = 1.0     # the demo server drops connections; don't wait long for a close frame
+CONTEXT_TIMEOUT = 3.0   # longest a stream waits for the question's compiled context
+CONTEXT_TOKEN = "unk:default"  # the only context token en_us-gen1-16khz allows
+CONTEXT_MAX_FAILURES = 2  # failed or too-slow compiles before the bridge stops using context
 DEMO_HOST = "demo.cobaltspeech.com"
 DEMO_MAX_STREAMS = 4
 NORMAL_CLOSE_CODES = (1000, 1006)  # 1006: the demo server never sends a close frame
@@ -78,10 +95,25 @@ ERR_TIMEOUT = "transcribe_timeout"          # nothing recognised within FINAL_TI
 END_OF_AUDIO = json.dumps({"audio": {"data": ""}})
 
 
-def stream_config(model: str) -> dict:
-    return {"config": {"model_id": model, "audio_format_raw": {
+def stream_config(model: str, context: dict | None = None) -> dict:
+    cfg = {"model_id": model, "audio_format_raw": {
         "encoding": "AUDIO_ENCODING_SIGNED", "bit_depth": 16,
-        "byte_order": "BYTE_ORDER_LITTLE_ENDIAN", "sample_rate": config.SAMPLE_RATE, "channels": 1}}}
+        "byte_order": "BYTE_ORDER_LITTLE_ENDIAN", "sample_rate": config.SAMPLE_RATE, "channels": 1}}
+    if context:
+        cfg["context"] = context
+    return {"config": cfg}
+
+
+def compile_url(stream_url: str) -> str:
+    """CompileContext's HTTP endpoint, next to the streaming WebSocket."""
+    url = stream_url.replace("wss://", "https://", 1).replace("ws://", "http://", 1)
+    return url.rstrip("/").removesuffix("streaming-recognize").rstrip("/") + "/compile-context"
+
+
+def context_phrases(question) -> list[str]:
+    """The question's accepted answers as written (or normalised), deduplicated."""
+    phrases = question.phrases or tuple(question.answers)
+    return list({p.strip().lower(): p.strip() for p in phrases if p.strip()}.values())
 
 
 class StreamLimit:
@@ -154,6 +186,7 @@ class StreamMetrics:
     open_requested: float
     slot_acquired: float | None = None     # got a slot under the demo cap (or no cap)
     connected: float | None = None         # WebSocket to Transcribe open
+    context: bool | None = None            # recognition context sent in the config
     config_sent: float | None = None       # stream ready for audio
     hold_start: float | None = None        # player pressed hold
     ready_at_hold_start: bool | None = None  # stream was ready when the player pressed hold
@@ -335,7 +368,9 @@ class Stream:
             raise StreamError(ERR_UNAVAILABLE, f"connect failed: {e!r}")
         async with ws:
             self.m.connected = time.monotonic()
-            await ws.send(json.dumps(stream_config(self.bridge.model)))
+            context = await self.bridge.context_for(self.rnd.question)
+            self.m.context = context is not None
+            await ws.send(json.dumps(stream_config(self.bridge.model, context)))
             self.m.config_sent = time.monotonic()
             self.ready = True
             writer = asyncio.create_task(self._write(ws))
@@ -478,9 +513,18 @@ class TranscribeBridge(Bridge):
 
     def __init__(self, url: str | None = None, model: str | None = None,
                  limit: StreamLimit | None | str = "default", final_timeout: float = FINAL_TIMEOUT,
-                 quiet_gap: float | None = None, slot_wait: float = CONNECT_TIMEOUT):
+                 quiet_gap: float | None = None, slot_wait: float = CONNECT_TIMEOUT,
+                 context: bool | None = None, context_url: str | None = None):
         self.url = url or config.TRANSCRIBE_URL
         self.model = model or config.TRANSCRIBE_MODEL
+        self.use_context = config.RECOGNITION_CONTEXT if context is None else context
+        if self.use_context and "gen1" not in self.model:
+            log.warning("recognition context needs a gen1 model, not %s: disabled", self.model)
+            self.use_context = False
+        self.context_url = context_url or compile_url(self.url)
+        self.contexts: dict[str, asyncio.Task] = {}  # question id -> compiled context (or None)
+        self.context_failures = 0
+        self._failed: set[asyncio.Task] = set()  # compile tasks already counted as failures
         self.limit = default_limit(self.url) if limit == "default" else limit
         self.final_timeout = final_timeout
         self.quiet_gap = config.FINAL_QUIET_GAP if quiet_gap is None else quiet_gap
@@ -492,6 +536,10 @@ class TranscribeBridge(Bridge):
 
     def open_count(self) -> int:
         return len(self.tasks)
+
+    def status(self):
+        return {"host": (urlparse(self.url).hostname or "").lower().rstrip(".") or None,
+                "stream_cap": self.limit.max if self.limit else None}
 
     def _open(self, room, rnd, player) -> Stream:
         key = (room.code, player.id)
@@ -518,6 +566,60 @@ class TranscribeBridge(Bridge):
         if self.streams.get(key) is stream and stream.task.done() and (stream.reported or not stream.held):
             del self.streams[key]
 
+    # --- recognition context ------------------------------------------------
+
+    def _context_task(self, question, retry: bool = False) -> asyncio.Task:
+        """The (cached) compile task; ``retry`` restarts one that failed."""
+        task = self.contexts.get(question.id)
+        failed = task is not None and task.done() and (task.cancelled() or task.result() is None)
+        if task is None or (retry and failed):
+            task = self.contexts[question.id] = asyncio.create_task(self._compile(question))
+        return task
+
+    async def _compile(self, question) -> dict | None:
+        phrases = context_phrases(question)
+        body = {"model_id": self.model, "token": CONTEXT_TOKEN, "phrases": [{"text": p} for p in phrases]}
+
+        def post():
+            resp = requests.post(self.context_url, json=body, timeout=CONTEXT_TIMEOUT,
+                                 verify=certifi.where())
+            resp.raise_for_status()
+            data = resp.json()["context"]["data"]
+            if not data:
+                raise ValueError("empty compiled context")
+            return {"compiled": [{"data": data}]}
+        try:
+            context = await asyncio.to_thread(post)
+            log.info("compiled recognition context for %s: %s", question.id, phrases)
+            return context
+        except Exception as e:
+            self._context_failed(asyncio.current_task(), question, repr(e))
+            return None  # retried when the question next starts (until disabled)
+
+    def _context_failed(self, task, question, why: str):
+        if task in self._failed:
+            return  # a slow compile that then fails counts once
+        self._failed.add(task)
+        self.context_failures += 1
+        log.warning("recognition context for %s failed (%s), streaming without it", question.id, why)
+        if self.context_failures >= CONTEXT_MAX_FAILURES and self.use_context:
+            self.use_context = False
+            log.warning("recognition context disabled after %d failures", self.context_failures)
+
+    async def context_for(self, question) -> dict | None:
+        """The question's compiled context, or None (off, failed or too slow).
+        Once a compile has failed, streams don't wait for one still running."""
+        if not self.use_context:
+            return None
+        task = self._context_task(question)
+        if self.context_failures and not task.done():
+            return None
+        try:
+            return await asyncio.wait_for(asyncio.shield(task), CONTEXT_TIMEOUT)
+        except TimeoutError:
+            self._context_failed(task, question, f"not ready after {CONTEXT_TIMEOUT:.0f} s")
+            return None
+
     def _current(self, room, rnd, player) -> Stream | None:
         stream = self.streams.get((room.code, player.id))
         return stream if stream is not None and stream.rnd is rnd else None
@@ -530,6 +632,8 @@ class TranscribeBridge(Bridge):
             if key[0] == room.code:
                 stream.close("cancelled")
                 del self.streams[key]
+        if self.use_context:
+            self._context_task(rnd.question, retry=True)  # compiles while the streams connect
         for player in list(room.players.values()):
             self._open(room, rnd, player)
 
@@ -569,7 +673,8 @@ class TranscribeBridge(Bridge):
         for stream in list(self.streams.values()):
             stream.close("cancelled")
         self.streams.clear()
-        tasks = list(self.tasks)
+        tasks = list(self.tasks) + list(self.contexts.values())
+        self.contexts.clear()
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)

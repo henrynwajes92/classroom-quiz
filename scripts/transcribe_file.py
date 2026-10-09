@@ -11,6 +11,11 @@ signed little-endian PCM using `audio_format_raw` (what a phone produces).
 --streamhdr sends a WAV header whose RIFF/data sizes are 0xFFFFFFFF
 ("unknown length", as when streaming), followed by the PCM. Fallback in case
 raw is not accepted.
+
+--context=word1,word2 compiles those phrases with CompileContext (HTTP POST
+.../compile-context, token "unk:default") and sends them as the stream's
+recognition context. gen1 models only (gen2 has supports_context false).
+--boost=N sets each phrase's boost factor (default: none sent).
 """
 import asyncio
 import base64
@@ -48,7 +53,17 @@ def streaming_wav_header(sample_rate=16000, channels=1, bits=16):
             + b"data" + struct.pack("<I", 0xFFFFFFFF))
 
 
-async def transcribe(path, model_id, realtime=False, mode="wav"):
+def compile_context(model_id, phrases, boost=None):
+    """CompileContext over the HTTP gateway; returns the RecognitionContext JSON."""
+    import requests
+    url = URL.replace("wss://", "https://").replace("streaming-recognize", "compile-context")
+    resp = requests.post(url, json={"model_id": model_id, "token": "unk:default", "phrases": [
+        {"text": p, **({"boost": boost} if boost else {})} for p in phrases]}, timeout=15)
+    resp.raise_for_status()
+    return {"compiled": [resp.json()["context"]]}
+
+
+async def transcribe(path, model_id, realtime=False, mode="wav", context=None, boost=None):
     with open(path, "rb") as f:
         audio = f.read()
     pcm = audio[WAV_HEADER:]
@@ -60,6 +75,10 @@ async def transcribe(path, model_id, realtime=False, mode="wav"):
     else:
         fmt_config = WAV_CONFIG
 
+    config = {"model_id": model_id, **fmt_config}
+    if context:
+        config["context"] = compile_context(model_id, context, boost)
+
     t_connect = time.monotonic()
     first_partial = None
     final_at = None
@@ -67,7 +86,7 @@ async def transcribe(path, model_id, realtime=False, mode="wav"):
     async with websockets.connect(URL, ssl=TLS, max_size=None) as ws:
         t0 = time.monotonic()  # timings below start once the connection is open
         connect_s = t0 - t_connect
-        await ws.send(json.dumps({"config": {"model_id": model_id, **fmt_config}}))
+        await ws.send(json.dumps({"config": config}))
 
         async def send_audio():
             for i in range(0, len(audio), CHUNK):
@@ -108,7 +127,7 @@ async def transcribe(path, model_id, realtime=False, mode="wav"):
         return f"{t:.2f} s" if t is not None else "(none)"
 
     print()
-    print(f"format:         {mode}  model: {model_id}")
+    print(f"format:         {mode}  model: {model_id}  context: {','.join(context or []) or '-'}")
     print(f"transcript:     {' '.join(finals) or '(none)'}")
     print(f"audio length:   {audio_seconds:.2f} s")
     print(f"connect:        {connect_s:.2f} s")
@@ -122,5 +141,8 @@ async def transcribe(path, model_id, realtime=False, mode="wav"):
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     mode = "raw" if "--raw" in sys.argv else "streamhdr" if "--streamhdr" in sys.argv else "wav"
+    opt = {a.split("=", 1)[0]: a.split("=", 1)[1] for a in sys.argv if a.startswith("--") and "=" in a}
+    context = opt["--context"].split(",") if "--context" in opt else None
+    boost = float(opt["--boost"]) if "--boost" in opt else None
     asyncio.run(transcribe(args[0], args[1] if len(args) > 1 else "en_us-gen2",
-                           "--realtime" in sys.argv, mode))
+                           "--realtime" in sys.argv, mode, context, boost))

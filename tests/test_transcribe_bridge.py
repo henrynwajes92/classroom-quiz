@@ -7,24 +7,28 @@ a close frame (1006) like the real server.
 import asyncio
 import base64
 import json
-from contextlib import asynccontextmanager
+import threading
+import time
+from contextlib import asynccontextmanager, contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 import websockets
 
-from server import config
+from server import config, transcribe_bridge
 from server.app import default_bridge
 from server.bridge import LoggingBridge
 from server.game import Client, Room
 from server.questions import Question
 from server.transcribe_bridge import (DEMO_LIMIT, ERR_FAILED, ERR_TIMEOUT, ERR_UNAVAILABLE,
-                                      StreamLimit, TranscribeBridge, default_limit)
+                                      StreamLimit, TranscribeBridge, compile_url, default_limit)
 
 QUESTIONS = [
     Question("france-capital", "What is the capital of France?", ["paris", "paris france"]),
     Question("red-planet", "Which planet is known as the Red Planet?", ["mars"]),
 ]
 CHUNK = b"\x01\x00" * 1600  # 0.1 s of PCM
+GEN1 = "en_us-gen1-16khz"  # recognition context is only used with gen1 models
 
 
 def result(text, partial):
@@ -365,6 +369,166 @@ def test_close_before_the_gap_still_reports():
         assert final["text"] == "Paris." and m.report_trigger == "close"
         assert m.reported - m.last_final < 1
     run(main())
+
+
+class TimedClient(Client):
+    """Records when each message was queued (time.monotonic(), like the metrics)."""
+
+    def __init__(self):
+        super().__init__(None)
+        self.sent = []
+
+    def send(self, msg):
+        self.sent.append((time.monotonic(), msg))
+
+
+def test_leaderboard_follows_each_final_at_once():
+    """4 players over real streams, default quiet gap: the leaderboard goes out
+    with each final (same step), so it reaches every client right behind it;
+    the final itself comes FINAL_QUIET_GAP after Transcribe's last result."""
+    async def main():
+        async with fake_server(close_after=1.0) as (fake, url):
+            bridge = TranscribeBridge(url, "m", limit=None)
+            assert bridge.quiet_gap == config.FINAL_QUIET_GAP
+            room = Room("TEST", TimedClient(), QUESTIONS, bridge, 30)
+            players = [room.add_player(n, TimedClient()) for n in ("A", "B", "C", "D")]
+            await room.start_question()
+            await until(lambda: fake.open == 4)
+            for p in players:
+                await answer(room, p)
+                await asyncio.sleep(0.05)
+            await until(lambda: all(m.reported for m in bridge.metrics))
+            metrics = {m.player_id: m for m in bridge.metrics}
+            for p in players:
+                for c in (room.host, p.client):  # final, then at once a leaderboard
+                    i = next(i for i, (_, msg) in enumerate(c.sent)
+                             if msg["type"] == "final" and msg["player_id"] == p.id)
+                    (t_final, _), (t_board, board) = c.sent[i], c.sent[i + 1]
+                    assert board["type"] == "leaderboard" and t_board - t_final < 0.01
+                assert t_final - metrics[p.id].last_final < bridge.quiet_gap + 0.1
+            for c in [room.host] + [p.client for p in players]:
+                assert sum(msg["type"] == "leaderboard" for _, msg in c.sent) == 4
+            final_board = [msg for _, msg in room.host.sent if msg["type"] == "leaderboard"][-1]
+            assert [p["score"] for p in final_board["players"]] == sorted(p.score for p in players)[::-1]
+            assert all(p.score >= 95 for p in players)
+            await bridge.aclose()
+    run(main())
+
+
+@contextmanager
+def fake_compile_server(status=200, data="Q1RY", delay=0.0):
+    """A CompileContext HTTP endpoint (in a thread); yields (request bodies, url)."""
+    bodies = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            bodies.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+            time.sleep(delay)
+            body = json.dumps({"context": {"data": data}}).encode()
+            try:
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                pass  # the client gave up (timeout test)
+
+        def log_message(self, *args):
+            pass
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    srv.daemon_threads, srv.block_on_close = True, False
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        yield bodies, f"http://127.0.0.1:{srv.server_address[1]}/v5/compile-context"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_recognition_context_compiled_once_per_question_and_sent():
+    async def main():
+        with fake_compile_server() as (bodies, compile_url_):
+            async with fake_server() as (fake, url):
+                q = Question("france-capital", "?", ["paris", "paris france"],
+                             phrases=("Paris", "paris", "Paris, France"))
+                bridge = TranscribeBridge(url, GEN1, limit=None, context=True, context_url=compile_url_)
+                room = Room("TEST", Client(None), [q], bridge, 30)
+                alice, bob = (room.add_player(n, Client(None)) for n in ("Alice", "Bob"))
+                for _ in range(2):  # the same question twice: compiled once
+                    await room.start_question(0)
+                    await answer(room, alice)
+                    await until(lambda: messages(alice, "final") and len(fake.configs) == 2 * room.round.number)
+                    await room.end_round("host")
+                assert bodies == [{"model_id": GEN1, "token": "unk:default",
+                                   "phrases": [{"text": "paris"}, {"text": "Paris, France"}]}]
+                assert all(c["config"]["context"] == {"compiled": [{"data": "Q1RY"}]} for c in fake.configs)
+                assert messages(alice, "final")[0]["correct"] and all(m.context for m in bridge.metrics)
+                await bridge.aclose()
+    run(main())
+
+
+def test_recognition_context_failure_streams_without_it():
+    async def main():
+        with fake_compile_server(status=500) as (bodies, compile_url_):
+            async with fake_server() as (fake, url):
+                bridge = TranscribeBridge(url, GEN1, limit=None, context=True, context_url=compile_url_)
+                room, [alice, bob] = make_room(bridge, "Alice", "Bob")
+                await room.start_question()
+                await answer(room, alice)
+                await until(lambda: messages(alice, "final") and len(fake.configs) == 2)
+                assert messages(alice, "final")[0]["correct"] and "error" not in messages(alice, "final")[0]
+                assert all("context" not in c["config"] for c in fake.configs)
+                assert [m.context for m in bridge.metrics] == [False, False]
+                assert len(bodies) == 1 and bridge.context_failures == 1  # once per round, not per stream
+                await room.end_round("host")
+                await room.start_question(0)
+                # 2nd failure: off. Wait for round 2's configs too, or end_round can
+                # close its unused streams before they send one.
+                await until(lambda: len(bodies) == 2 and not bridge.use_context and len(fake.configs) == 4)
+                await room.end_round("host")
+                await room.start_question(0)
+                await until(lambda: len(fake.configs) == 6)
+                assert len(bodies) == 2  # no more compiles
+                await bridge.aclose()
+    run(main())
+
+
+def test_slow_compile_holds_streams_up_once_then_never(monkeypatch):
+    """A compile endpoint slower than CONTEXT_TIMEOUT delays round 1's configs
+    by at most the timeout; after that, configs go out without waiting."""
+    monkeypatch.setattr(transcribe_bridge, "CONTEXT_TIMEOUT", 0.3)
+
+    async def main():
+        with fake_compile_server(delay=1.0) as (bodies, compile_url_):
+            async with fake_server() as (fake, url):
+                bridge = TranscribeBridge(url, GEN1, limit=None, context=True, context_url=compile_url_)
+                room, players = make_room(bridge, "A", "B")
+                await room.start_question()
+                await until(lambda: all(m.config_sent for m in bridge.metrics))
+                # A stream that connects after the first one timed out doesn't wait at all.
+                waits = [m.config_sent - m.connected for m in bridge.metrics]
+                assert all(w < 0.6 for w in waits) and max(waits) > 0.1
+                await until(lambda: bridge.context_failures == 1 and bridge.contexts[QUESTIONS[0].id].done())
+                await room.end_round("host")
+                await room.start_question(0)  # retries the compile, but nobody waits for it
+                await until(lambda: len(bridge.metrics) == 4 and all(m.config_sent for m in bridge.metrics))
+                assert all(m.config_sent - m.connected < 0.1 and not m.context for m in bridge.metrics[2:])
+                await until(lambda: len(bodies) == 2)
+                await bridge.aclose()
+    run(main())
+
+
+def test_recognition_context_setting(monkeypatch):
+    demo = "wss://demo.cobaltspeech.com/transcribe/api/transcribe/v5/streaming-recognize"
+    assert compile_url(demo) == "https://demo.cobaltspeech.com/transcribe/api/transcribe/v5/compile-context"
+    assert compile_url("ws://127.0.0.1:9/") == "http://127.0.0.1:9/compile-context"
+    monkeypatch.setattr(config, "RECOGNITION_CONTEXT", False)
+    assert TranscribeBridge(demo, GEN1).use_context is False
+    monkeypatch.setattr(config, "RECOGNITION_CONTEXT", True)
+    assert TranscribeBridge(demo, GEN1).use_context is True
+    assert TranscribeBridge(demo, "en_us-gen2").use_context is False  # gen1 only
 
 
 def test_connect_failure_gives_unavailable():

@@ -58,9 +58,17 @@ class Bridge:
     async def aclose(self):
         """Server shutdown: release anything still open."""
 
+    def status(self) -> dict | None:
+        """For /health: {"host": Transcribe host or None, "stream_cap": max
+        concurrent streams or None}. None means unknown."""
+        return None
+
 
 class LoggingBridge(Bridge):
     """Placeholder: no recognition, just log what would be forwarded."""
+
+    def status(self):
+        return {"host": None, "stream_cap": None}  # no Transcribe at all
 
     async def question_started(self, room, rnd):
         log.info("room %s round %d: would open %d streams", room.code, rnd.number, len(room.players))

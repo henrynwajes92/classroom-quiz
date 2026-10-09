@@ -175,14 +175,24 @@ class Room:
         self.to_players(msg)
 
     def leaderboard_msg(self) -> dict:
+        """Ranking by score (ties share a rank, listed by name), with each
+        player's points in the current (or last) round."""
         ranked = sorted(self.players.values(), key=lambda p: (-p.score, p.name.lower()))
-        return {"type": "leaderboard",
-                "players": [{"player_id": p.id, "name": p.name, "score": p.score} for p in ranked]}
+        answers = self.round.answers if self.round else {}
+        rows, rank = [], 0
+        for i, p in enumerate(ranked):
+            if i == 0 or p.score != ranked[i - 1].score:
+                rank = i + 1
+            a = answers.get(p.id)
+            rows.append({"player_id": p.id, "name": p.name, "score": p.score, "rank": rank,
+                         "round_points": a.points if a else 0})
+        return {"type": "leaderboard", "round": self.round.number if self.round else None,
+                "players": rows}
 
     def question_msg(self, rnd: Round) -> dict:
         return {"type": "question", "round": rnd.number, "question_id": rnd.question.id,
                 "index": rnd.index, "total": len(self.questions), "text": rnd.question.text,
-                "time_limit": rnd.time_limit,
+                "hint": rnd.question.hint, "time_limit": rnd.time_limit,
                 "remaining": round(max(0.0, rnd.time_limit - rnd.elapsed()), 2)}
 
     # --- players -----------------------------------------------------------
@@ -210,6 +220,7 @@ class Room:
         self.host.send({"type": "player_left", "player_id": player.id, "name": player.name,
                         "count": len(self.players)})
         log.info("room %s: %s left (%d players)", self.code, player.name, len(self.players))
+        self.to_everyone(self.leaderboard_msg())  # so boards drop them
         await self._hook("player_left", player)
 
     # --- rounds ------------------------------------------------------------

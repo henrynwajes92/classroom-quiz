@@ -4,7 +4,7 @@ uvicorn==0.54.0
 websockets==17.2
 certifi==2026.7.22  # TLS for the Transcribe bridge
 
-# scripts/ (VoiceGen clips)
+# scripts/ (VoiceGen clips) and the bridge's CompileContext call
 requests==2.34.2
 
 # Tests (httpx2 is what starlette's TestClient wants now)
