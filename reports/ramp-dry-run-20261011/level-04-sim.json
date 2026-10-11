@@ -25,7 +25,7 @@
  "metrics_summary": {
   "type": "metrics_summary",
   "round": 2,
-  "report": "/tmp/claude-1000/-home-bishop-henry-n/9aae8321-080b-48ad-a0be-05f0e3ff3ce6/scratchpad/ramp-dry/20261011-195340-CUAH",
+  "report": "level-04-room",
   "this_round": {
    "rows": 4,
    "answers": 4,

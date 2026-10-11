@@ -9,3 +9,4 @@ tools/
 # Server metrics reports (one folder per room) stay local; ramp reports (CQ-12) are committed.
 reports/*
 !reports/ramp-*/
+.claude/worktrees/

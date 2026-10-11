@@ -333,11 +333,15 @@ def main(argv=None) -> int:
         print(f"\n=== level {i + 1}/{len(args.levels)}: {n} players ===")
         res = asyncio.run(simulate.amain(sim_args(args, n, expect_summary)))
         out.mkdir(parents=True, exist_ok=True)
-        (out / f"level-{n:02d}-sim.json").write_text(json.dumps(res, indent=1), encoding="utf-8")
         row = level_row(n, res)
         rows.append(row)
         if row["report"] and Path(row["report"]).is_dir():  # server on this machine: keep its stream rows
             shutil.copytree(row["report"], out / f"level-{n:02d}-room", dirs_exist_ok=True)
+            # Point at the copy: the server's own path is local (and names the user's home).
+            row["report"] = f"level-{n:02d}-room"
+            if res.get("metrics_summary"):
+                res["metrics_summary"]["report"] = row["report"]
+        (out / f"level-{n:02d}-sim.json").write_text(json.dumps(res, indent=1), encoding="utf-8")
         print(f"level {n}: {row['answers']} answers, {row['errors']} errors, answer p50 {row['answer_p50']} "
               f"p95 {row['answer_p95']} (source: {row['source']})")
         if res["host_error"] or res["aggregate"]["joined"] < n or res.get("interrupted"):

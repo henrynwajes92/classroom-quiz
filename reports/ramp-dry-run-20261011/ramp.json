@@ -49,7 +49,7 @@
    "client_answer_p50": 0.756,
    "client_answer_p95": 0.807,
    "host_error": null,
-   "report": "/tmp/claude-1000/-home-bishop-henry-n/9aae8321-080b-48ad-a0be-05f0e3ff3ce6/scratchpad/ramp-dry/20261011-195315-XRQU"
+   "report": "level-01-room"
   },
   {
    "players": 4,
@@ -83,7 +83,7 @@
    "client_answer_p50": 0.788,
    "client_answer_p95": 0.856,
    "host_error": null,
-   "report": "/tmp/claude-1000/-home-bishop-henry-n/9aae8321-080b-48ad-a0be-05f0e3ff3ce6/scratchpad/ramp-dry/20261011-195340-CUAH"
+   "report": "level-04-room"
   }
  ]
 }
