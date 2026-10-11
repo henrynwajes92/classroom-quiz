@@ -21,7 +21,10 @@ and latency (count, p50/p95/max) split into "ready" (spoke >= 3 s after the
 question, stream most likely connected: the API's latency) and "early" (also
 includes catching up on audio buffered while the stream connected). audio_s
 of a cut-off answer is an upper bound (chunks in flight at round_end are
-rejected). --out writes the same as JSON.
+rejected). --out writes the same as JSON. --metrics-wait N (--host) waits up
+to N s after the last round for the server's metrics_summary (CQ-10; sent once
+the round's Transcribe streams have finished) and adds the last one to --out
+as "metrics_summary" (scripts/ramp.py uses it).
 
 Exit code: 0 if every player joined and nothing went wrong; 1 if the host
 failed, no player joined, or there was any error (protocol error, disconnect,
@@ -303,7 +306,9 @@ class Simulation:
                                   random.Random(f"{args.seed}-{i}") if args.seed is not None else random.Random())
                         for i in range(args.players)]
         self.rounds: list[dict] = []  # host mode: what the host saw
+        self.metrics_summaries: list[dict] = []  # host mode: the server's metrics_summary messages
         self.host_error = None
+        self.interrupted = False
 
     def pcm(self, path) -> bytes:
         if path not in self._pcm:
@@ -334,7 +339,10 @@ class Simulation:
 
             async def read():
                 async for raw in host:
-                    inbox.put_nowait(json.loads(raw))
+                    msg = json.loads(raw)
+                    if msg.get("type") == "metrics_summary":
+                        self.metrics_summaries.append(msg)
+                    inbox.put_nowait(msg)
 
             async def next_msg(kind, timeout):
                 async with asyncio.timeout(timeout):
@@ -371,6 +379,11 @@ class Simulation:
                 while time.monotonic() < deadline and not all(p.round_done(q["round"]) for p in self.players):
                     await asyncio.sleep(0.05)
                 await asyncio.sleep(self.args.gap)
+            # The last round's summary comes once its streams have finished.
+            deadline = time.monotonic() + self.args.metrics_wait
+            while time.monotonic() < deadline and not any(
+                    m.get("round") == q["round"] for m in self.metrics_summaries):
+                await asyncio.sleep(0.1)
         # Leaving closes the room; players get room_closed and finish.
         await asyncio.wait(tasks[1:], timeout=10)
 
@@ -399,7 +412,9 @@ class Simulation:
         total = lambda k: sum(p[k] for p in players)  # noqa: E731
         return {"server": self.server, "room": self.room, "seed": self.args.seed,
                 "correct_rate": self.args.correct_rate, "ready_delay_s": READY_DELAY, "rounds": self.rounds,
-                "host_error": self.host_error, "players": players,
+                "host_error": self.host_error, "interrupted": self.interrupted,
+                "metrics_summary": max(self.metrics_summaries, key=lambda m: m.get("round") or 0, default=None),
+                "players": players,
                 "aggregate": {"players": len(players), "joined": total("joined"),
                               "answers_sent": total("answers_sent"), "results": total("results"),
                               "correct": total("correct"),
@@ -459,6 +474,9 @@ def parse_args(argv=None):
                    help="the game server's TRANSCRIBE_URL (default: this shell's, or the server default)")
     p.add_argument("--i-asked-ops", action="store_true",
                    help=f"allow more than {DEMO_MAX_STREAMS} players against the demo server")
+    p.add_argument("--metrics-wait", type=float, default=0.0,
+                   help="--host: after the last round, wait up to this many seconds for the server's "
+                        "metrics_summary and include it in --out")
     p.add_argument("--out", help="also write the results as JSON here")
     args = p.parse_args(argv)
     if args.players < 1 or args.min_delay < 0 or args.max_delay < args.min_delay:
@@ -486,6 +504,7 @@ async def amain(args) -> dict:
     try:
         await sim.run()
     except asyncio.CancelledError:
+        sim.interrupted = True
         print("\ninterrupted")
     finally:
         try:

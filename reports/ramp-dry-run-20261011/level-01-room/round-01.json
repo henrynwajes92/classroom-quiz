@@ -1,0 +1,81 @@
+{
+ "summary": {
+  "rows": 1,
+  "answers": 1,
+  "errors": 0,
+  "error_rate": 0.0,
+  "error_codes": {},
+  "cut_off": 0,
+  "retried": 0,
+  "connect_s": {
+   "count": 1,
+   "p50": 0.75,
+   "p95": 0.75,
+   "max": 0.75
+  },
+  "answer_latency_s": {
+   "count": 1,
+   "p50": 0.752,
+   "p95": 0.752,
+   "max": 0.752
+  },
+  "api_latency_s": {
+   "count": 1,
+   "p50": 0.249,
+   "p95": 0.249,
+   "max": 0.249
+  },
+  "correct": 1,
+  "scored": 1,
+  "correct_rate": 1.0,
+  "dropped_after_answer": 0,
+  "sim_scored": 1,
+  "mean_wer": 0.0,
+  "scorer_agrees": 1.0
+ },
+ "streams": [
+  {
+   "room": "XRQU",
+   "round": 1,
+   "question_id": "france-capital",
+   "player_id": "p1",
+   "player": "L1-01 (LTTS_5789)",
+   "simulated": true,
+   "attempts": 1,
+   "outcome": "final",
+   "error": null,
+   "error_detail": null,
+   "report_trigger": "quiet_gap",
+   "close_code": null,
+   "close_reason": "closed by the bridge (cancelled)",
+   "context": false,
+   "round_streams": 1,
+   "open_streams_at_release": 1,
+   "ready_at_hold_start": true,
+   "cut_off": false,
+   "connect_s": 0.75,
+   "slot_wait_s": 0.0,
+   "answer_latency_s": 0.752,
+   "send_backlog_s": 0.002,
+   "end_to_final_s": 0.249,
+   "quiet_wait_s": 0.501,
+   "api_latency_s": 0.249,
+   "first_partial_s": null,
+   "close_delay_s": 1.697,
+   "backlog_at_release_s": 0.0,
+   "audio_s": 0.836,
+   "partials": 0,
+   "finals": 1,
+   "late_finals": 0,
+   "transcript": "Paris.",
+   "said": "Paris",
+   "expected_answer": "paris",
+   "correct": true,
+   "expect_correct": true,
+   "points": 87,
+   "wer": 0.0,
+   "post_report_error": null,
+   "started_at": "2026-10-11T19:53:08.534"
+  }
+ ]
+}

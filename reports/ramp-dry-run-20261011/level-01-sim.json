@@ -1,0 +1,224 @@
+{
+ "server": "ws://127.0.0.1:8777",
+ "room": "XRQU",
+ "seed": 12,
+ "correct_rate": 0.75,
+ "ready_delay_s": 3.0,
+ "rounds": [
+  {
+   "round": 1,
+   "question_id": "france-capital",
+   "reason": "host",
+   "answered": 1,
+   "players": 1
+  },
+  {
+   "round": 2,
+   "question_id": "red-planet",
+   "reason": "host",
+   "answered": 1,
+   "players": 1
+  }
+ ],
+ "host_error": null,
+ "interrupted": false,
+ "metrics_summary": {
+  "type": "metrics_summary",
+  "round": 2,
+  "report": "/tmp/claude-1000/-home-bishop-henry-n/9aae8321-080b-48ad-a0be-05f0e3ff3ce6/scratchpad/ramp-dry/20261011-195315-XRQU",
+  "this_round": {
+   "rows": 1,
+   "answers": 1,
+   "errors": 0,
+   "error_rate": 0.0,
+   "error_codes": {},
+   "cut_off": 0,
+   "retried": 0,
+   "connect_s": {
+    "count": 1,
+    "p50": 0.964,
+    "p95": 0.964,
+    "max": 0.964
+   },
+   "answer_latency_s": {
+    "count": 1,
+    "p50": 0.801,
+    "p95": 0.801,
+    "max": 0.801
+   },
+   "api_latency_s": {
+    "count": 1,
+    "p50": 0.298,
+    "p95": 0.298,
+    "max": 0.298
+   },
+   "correct": 0,
+   "scored": 1,
+   "correct_rate": 0.0,
+   "dropped_after_answer": 0,
+   "sim_scored": 1,
+   "mean_wer": 0.0,
+   "scorer_agrees": 1.0
+  },
+  "by_streams": [
+   {
+    "round_streams": 1,
+    "rounds": 2,
+    "rows": 2,
+    "answers": 2,
+    "errors": 0,
+    "error_rate": 0.0,
+    "error_codes": {},
+    "cut_off": 0,
+    "retried": 0,
+    "connect_s": {
+     "count": 2,
+     "p50": 0.75,
+     "p95": 0.964,
+     "max": 0.964
+    },
+    "answer_latency_s": {
+     "count": 2,
+     "p50": 0.752,
+     "p95": 0.801,
+     "max": 0.801
+    },
+    "api_latency_s": {
+     "count": 2,
+     "p50": 0.249,
+     "p95": 0.298,
+     "max": 0.298
+    },
+    "correct": 1,
+    "scored": 2,
+    "correct_rate": 0.5,
+    "dropped_after_answer": 0,
+    "sim_scored": 2,
+    "mean_wer": 0.0,
+    "scorer_agrees": 1.0
+   },
+   {
+    "round_streams": "all",
+    "rounds": 2,
+    "rows": 2,
+    "answers": 2,
+    "errors": 0,
+    "error_rate": 0.0,
+    "error_codes": {},
+    "cut_off": 0,
+    "retried": 0,
+    "connect_s": {
+     "count": 2,
+     "p50": 0.75,
+     "p95": 0.964,
+     "max": 0.964
+    },
+    "answer_latency_s": {
+     "count": 2,
+     "p50": 0.752,
+     "p95": 0.801,
+     "max": 0.801
+    },
+    "api_latency_s": {
+     "count": 2,
+     "p50": 0.249,
+     "p95": 0.298,
+     "max": 0.298
+    },
+    "correct": 1,
+    "scored": 2,
+    "correct_rate": 0.5,
+    "dropped_after_answer": 0,
+    "sim_scored": 2,
+    "mean_wer": 0.0,
+    "scorer_agrees": 1.0
+   }
+  ]
+ },
+ "players": [
+  {
+   "name": "L1-01 (LTTS_5789)",
+   "player_id": "p1",
+   "voice": "LTTS_5789",
+   "joined": true,
+   "answers_sent": 2,
+   "results": 2,
+   "correct": 1,
+   "error_finals": 0,
+   "errors": 0,
+   "latency_ready": {
+    "count": 2,
+    "p50": 0.756,
+    "p95": 0.807,
+    "max": 0.807
+   },
+   "latency_early": {
+    "count": 0,
+    "p50": null,
+    "p95": null,
+    "max": null
+   },
+   "answers": [
+    {
+     "round": 1,
+     "question_id": "france-capital",
+     "clip": "clips/france-capital/04_LTTS_5789.wav",
+     "clip_text": "Paris",
+     "expected_correct": true,
+     "delay_s": 3.15,
+     "audio_s": 0.84,
+     "stream_likely_ready": true,
+     "cut_off": false,
+     "partials": 0,
+     "text": "Paris.",
+     "correct": true,
+     "points": 87,
+     "score": 87,
+     "error": null,
+     "latency_s": 0.756
+    },
+    {
+     "round": 2,
+     "question_id": "red-planet",
+     "clip": "clips/red-planet/09_LTTS_5789.wav",
+     "clip_text": "I think it's Jupiter",
+     "expected_correct": false,
+     "delay_s": 3.117,
+     "audio_s": 1.11,
+     "stream_likely_ready": true,
+     "cut_off": false,
+     "partials": 1,
+     "text": "I think It's Jupiter.",
+     "correct": false,
+     "points": 0,
+     "score": 87,
+     "error": null,
+     "latency_s": 0.807
+    }
+   ],
+   "error_log": []
+  }
+ ],
+ "aggregate": {
+  "players": 1,
+  "joined": 1,
+  "answers_sent": 2,
+  "results": 2,
+  "correct": 1,
+  "expected_correct": 1,
+  "error_finals": 0,
+  "errors": 0,
+  "latency_ready": {
+   "count": 2,
+   "p50": 0.756,
+   "p95": 0.807,
+   "max": 0.807
+  },
+  "latency_early": {
+   "count": 0,
+   "p50": null,
+   "p95": null,
+   "max": null
+  }
+ }
+}

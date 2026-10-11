@@ -98,6 +98,11 @@ useful thing to show customers.
 - Dedicated instance (to be agreed with ops): the full ramp and the demo.
 - Simulated players get random start delays (0–2 s) and 8 different VoiceGen
   voices, so they don't all speak in perfect sync.
+- Runner: `scripts/ramp.py` (CQ-12). One room per level, so the server's
+  per-room CQ-10 report is that level's; players speak 3–5 s after the
+  question (streams are connected by then, so the ramp measures Transcribe,
+  not connect backlog). Ramp reports go in `reports/ramp-*/` and are
+  committed; the server's per-room folders stay gitignored.
 
 ## Risks to check early
 
