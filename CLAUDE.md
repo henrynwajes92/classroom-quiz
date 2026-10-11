@@ -82,6 +82,15 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # still applies unless it runs with ALLOW_DEMO_LOAD=1. Wrap live runs in
 # `flock /tmp/cobalt_demo.lock` so agents don't overlap on the demo server.
 .venv/bin/python scripts/simulate.py --players 4 --host --rounds 2 --server ws://localhost:8000 --out results.json
+
+# ramp test (CQ-12): one simulator room per level, --rounds questions each,
+# --pause s between levels, players speak 3-5 s in. Report from the server's
+# metrics_summary (client timing if it sends none): reports/ramp-<time>/ramp.json,
+# ramp.csv, ramp.svg chart + a table. Same demo-server refusal as simulate.py
+# (any level > 4). Dry run on the demo server first, inside the flock:
+flock /tmp/cobalt_demo.lock .venv/bin/python scripts/ramp.py --levels 1,4 --rounds 2 --server ws://localhost:8000
+# full ramp: only on the agreed dedicated instance, inside the agreed window
+.venv/bin/python scripts/ramp.py --levels 1,5,10,20,35 --rounds 3 --pause 10 --server ws://localhost:8000
 ```
 
 Server settings (env vars): `TRANSCRIBE_URL`, `TRANSCRIBE_MODEL`,
@@ -96,7 +105,7 @@ before the answer is scored, instead of waiting ~2 s for Transcribe to close
 the stream), `RECOGNITION_CONTEXT` (set to `1` to compile each question's
 accepted answers with Transcribe's CompileContext and send them as recognition
 context; gen1 models only; off by default), `REPORTS_DIR` (default
-`reports/`, gitignored: the metrics report, one folder per room with
+`reports/`; the per-room folders are gitignored, `reports/ramp-*/` (CQ-12) are committed: the metrics report, one folder per room with
 `round-NN.json/.csv`, `streams.csv` and `summary.json/.csv` grouped by streams
 per round, rewritten after each round; columns are documented in
 `server/metrics.py`). The

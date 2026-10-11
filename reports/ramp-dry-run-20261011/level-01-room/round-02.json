@@ -1,0 +1,81 @@
+{
+ "summary": {
+  "rows": 1,
+  "answers": 1,
+  "errors": 0,
+  "error_rate": 0.0,
+  "error_codes": {},
+  "cut_off": 0,
+  "retried": 0,
+  "connect_s": {
+   "count": 1,
+   "p50": 0.964,
+   "p95": 0.964,
+   "max": 0.964
+  },
+  "answer_latency_s": {
+   "count": 1,
+   "p50": 0.801,
+   "p95": 0.801,
+   "max": 0.801
+  },
+  "api_latency_s": {
+   "count": 1,
+   "p50": 0.298,
+   "p95": 0.298,
+   "max": 0.298
+  },
+  "correct": 0,
+  "scored": 1,
+  "correct_rate": 0.0,
+  "dropped_after_answer": 0,
+  "sim_scored": 1,
+  "mean_wer": 0.0,
+  "scorer_agrees": 1.0
+ },
+ "streams": [
+  {
+   "room": "XRQU",
+   "round": 2,
+   "question_id": "red-planet",
+   "player_id": "p1",
+   "player": "L1-01 (LTTS_5789)",
+   "simulated": true,
+   "attempts": 1,
+   "outcome": "final",
+   "error": null,
+   "error_detail": null,
+   "report_trigger": "quiet_gap",
+   "close_code": 1006,
+   "close_reason": null,
+   "context": false,
+   "round_streams": 1,
+   "open_streams_at_release": 1,
+   "ready_at_hold_start": true,
+   "cut_off": false,
+   "connect_s": 0.964,
+   "slot_wait_s": 0.006,
+   "answer_latency_s": 0.801,
+   "send_backlog_s": 0.001,
+   "end_to_final_s": 0.298,
+   "quiet_wait_s": 0.502,
+   "api_latency_s": 0.298,
+   "first_partial_s": 1.379,
+   "close_delay_s": 1.516,
+   "backlog_at_release_s": 0.0,
+   "audio_s": 1.115,
+   "partials": 1,
+   "finals": 1,
+   "late_finals": 0,
+   "transcript": "I think It's Jupiter.",
+   "said": "I think it's Jupiter",
+   "expected_answer": "mars",
+   "correct": false,
+   "expect_correct": false,
+   "points": 0,
+   "wer": 0.0,
+   "post_report_error": null,
+   "started_at": "2026-10-11T19:53:14.984"
+  }
+ ]
+}
