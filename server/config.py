@@ -21,6 +21,9 @@ FINAL_QUIET_GAP = float(os.environ.get("FINAL_QUIET_GAP", "0.5"))
 # recognition context (gen1 models only; see server/transcribe_bridge.py).
 RECOGNITION_CONTEXT = os.environ.get("RECOGNITION_CONTEXT") == "1"
 
+# Metrics reports (CQ-10): one folder per room, written after each round.
+REPORTS_DIR = Path(os.environ.get("REPORTS_DIR", ROOT / "reports"))
+
 QUESTIONS_FILE = Path(os.environ.get("QUESTIONS_FILE", ROOT / "questions" / "general.json"))
 ROUND_SECONDS = float(os.environ.get("ROUND_SECONDS", "20"))
 MIN_TIME_LIMIT, MAX_TIME_LIMIT = 3, 120  # allowed per-question override from the host

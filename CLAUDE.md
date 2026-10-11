@@ -91,6 +91,10 @@ stream waits up to 10 s for a free slot, then the answer gets a
 before the answer is scored, instead of waiting ~2 s for Transcribe to close
 the stream), `RECOGNITION_CONTEXT` (set to `1` to compile each question's
 accepted answers with Transcribe's CompileContext and send them as recognition
-context; gen1 models only; off by default). The
+context; gen1 models only; off by default), `REPORTS_DIR` (default
+`reports/`, gitignored: the metrics report, one folder per room with
+`round-NN.json/.csv`, `streams.csv` and `summary.json/.csv` grouped by streams
+per round, rewritten after each round; columns are documented in
+`server/metrics.py`). The
 client/server message contract is `docs/protocol.md`. Scoring rules and the
 points formula are in the `server/scoring.py` docstring.

@@ -88,8 +88,10 @@ Names are 1–24 characters and unique in the room (case-insensitive).
 ```json
 {"type": "join", "room": "KXQB", "name": "Alice"}
 ```
+Optional `"simulated": true` (the simulator sends it) marks the player as
+simulated in the metrics report. Phones leave it out.
 Reply: `joined`, or `error` with `room_not_found`, `bad_name`, `name_taken`,
-`already_joined`.
+`already_joined`, `bad_message` (`simulated` not a boolean).
 
 ### `hold_start`
 Player pressed "hold to answer". Only while a round is open, once per round.
@@ -97,7 +99,14 @@ Player pressed "hold to answer". Only while a round is open, once per round.
 ```json
 {"type": "hold_start"}
 ```
-Errors: `no_round`, `already_answered`.
+The simulator also sends what its clip says and whether it is a right answer,
+for the metrics report only (WER, scorer agreement); they never affect scoring:
+
+```json
+{"type": "hold_start", "said": "The answer is yellow", "expect_correct": true}
+```
+Errors: `no_round`, `already_answered`, `bad_message` (`said` not text of at
+most 200 characters, `expect_correct` not a boolean).
 
 ### `audio`
 A chunk of the answer: **16 kHz, mono, 16-bit little-endian PCM, no header**.
@@ -299,6 +308,40 @@ last ~1 s); a late final is sent separately as `final` + `leaderboard`.
    {"player_id": "p7", "name": "Alice", "transcript": "Paris.", "correct": true, "points": 100},
    {"player_id": "p2", "name": "Bob", "transcript": null, "correct": null, "points": 0}
  ]}
+```
+
+### `stream_metrics` (→ host)
+Sent when an answer is reported (with the `final`), for a live metrics
+panel. Only with the Transcribe bridge. Seconds; `null` when not measured.
+`api_latency_s` is Transcribe's end-of-audio → final time, only for streams
+that were ready when the player pressed hold and had nothing left to send at
+release; `open_streams` is the number of Transcribe streams open on the
+server at release. See `server/metrics.py`.
+
+```json
+{"type": "stream_metrics", "round": 1, "player_id": "p7", "name": "Alice",
+ "connect_s": 1.42, "answer_latency_s": 0.81, "api_latency_s": 0.29,
+ "error": null, "open_streams": 4}
+```
+
+### `metrics_summary` (→ host)
+Sent once all of a round's Transcribe streams have finished (up to ~10 s
+after `round_end`), when the round's report has been written. `this_round`
+summarises the round; `by_streams` the whole room so far, one entry per
+number of streams in the round, then `"all"`. `report` is the folder on the
+server (`null` if not written). Field meanings: `server/metrics.py`.
+
+```json
+{"type": "metrics_summary", "round": 1, "report": "reports/20261011-201500-KXQB",
+ "this_round": {"rows": 4, "answers": 4, "errors": 0, "error_rate": 0.0, "error_codes": {},
+   "cut_off": 0, "retried": 0,
+   "connect_s": {"count": 4, "p50": 1.4, "p95": 2.1, "max": 2.1},
+   "answer_latency_s": {"count": 4, "p50": 0.8, "p95": 0.9, "max": 0.9},
+   "api_latency_s": {"count": 3, "p50": 0.3, "p95": 0.31, "max": 0.31},
+   "correct": 3, "scored": 4, "correct_rate": 0.75, "sim_scored": 4, "mean_wer": 0.1,
+   "scorer_agrees": 1.0, "dropped_after_answer": 0},
+ "by_streams": [{"round_streams": 4, "rounds": 1, "...": "same fields"},
+                {"round_streams": "all", "rounds": 1, "...": "same fields"}]}
 ```
 
 ### `room_closed` (→ all players)

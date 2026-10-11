@@ -23,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config
 from .bridge import Bridge, LoggingBridge
+from .metrics import MetricsRecorder
 from .transcribe_bridge import TranscribeBridge
 from .game import Client, GameError, Lobby, Player, Room
 from .questions import Question, load_questions
@@ -32,6 +33,7 @@ log = logging.getLogger("quiz.app")
 WEB_DIR = config.ROOT / "web"
 # No caching: phones should pick up page fixes on reload during the hackathon.
 NO_CACHE = {"Cache-Control": "no-cache"}
+MAX_SAID_LEN = 200  # hold_start "said" (simulated players' clip text)
 
 
 def phone_page(room: str | None) -> str:
@@ -94,7 +96,7 @@ def default_bridge() -> Bridge:
     if config.BRIDGE == "logging":
         return LoggingBridge()
     if config.BRIDGE == "transcribe":
-        return TranscribeBridge()
+        return TranscribeBridge(recorder=MetricsRecorder(config.REPORTS_DIR))
     raise ValueError(f"BRIDGE must be 'transcribe' or 'logging', not {config.BRIDGE!r}")
 
 
@@ -167,12 +169,20 @@ def create_app(questions: list[Question] | None = None, bridge: Bridge | None = 
                 if player:
                     raise GameError("already_joined", "already in a room")
                 r = lobby.get(msg.get("room", ""))
-                player = r.add_player(msg.get("name", ""), client)
+                simulated = msg.get("simulated", False)
+                if not isinstance(simulated, bool):
+                    raise GameError("bad_message", "simulated must be true or false")
+                player = r.add_player(msg.get("name", ""), client, simulated)
                 room = r
             elif player is None:
                 raise GameError("not_joined", 'send "join" first')
             elif kind == "hold_start":
-                await room.hold_start(player)
+                said, expect = msg.get("said"), msg.get("expect_correct")
+                if said is not None and not (isinstance(said, str) and len(said) <= MAX_SAID_LEN):
+                    raise GameError("bad_message", f"said must be text of at most {MAX_SAID_LEN} characters")
+                if expect is not None and not isinstance(expect, bool):
+                    raise GameError("bad_message", "expect_correct must be true or false")
+                await room.hold_start(player, said, expect)
             elif kind == "audio":
                 try:
                     chunk = base64.b64decode(msg.get("data", ""), validate=True)

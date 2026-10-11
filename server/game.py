@@ -109,6 +109,7 @@ class Player:
     name: str
     client: Client
     score: int = 0
+    simulated: bool = False  # joined with "simulated": true (the simulator)
 
 
 @dataclass
@@ -123,6 +124,9 @@ class Answer:
     final_at: float | None = None
     correct: bool | None = None
     points: int = 0
+    simulated: bool = False
+    said: str | None = None              # simulated players: the clip's words (for WER)
+    expect_correct: bool | None = None   # simulated players: whether the clip is a right answer
 
     @property
     def holding(self) -> bool:
@@ -197,14 +201,14 @@ class Room:
 
     # --- players -----------------------------------------------------------
 
-    def add_player(self, name: str, client: Client) -> Player:
+    def add_player(self, name: str, client: Client, simulated: bool = False) -> Player:
         name = " ".join(str(name).split())
         if not name or len(name) > MAX_NAME_LEN:
             raise GameError("bad_name", f"name must be 1-{MAX_NAME_LEN} characters")
         if any(p.name.lower() == name.lower() for p in self.players.values()):
             raise GameError("name_taken", f"someone in this room is already called {name!r}")
         self._next_player += 1
-        player = Player(f"p{self._next_player}", name, client)
+        player = Player(f"p{self._next_player}", name, client, simulated=simulated)
         self.players[player.id] = player
         client.send({"type": "joined", "room": self.code, "player_id": player.id, "name": name})
         self.host.send({"type": "player_joined", "player_id": player.id, "name": name,
@@ -285,13 +289,16 @@ class Room:
 
     # --- answers (player -> server) ----------------------------------------
 
-    async def hold_start(self, player: Player):
+    async def hold_start(self, player: Player, said: str | None = None, expect_correct: bool | None = None):
+        """``said`` / ``expect_correct``: a simulated player's clip text and
+        right/wrong label, kept for the metrics report only."""
         rnd = self.round
         if rnd is None or not rnd.open:
             raise GameError("no_round", "no question is open")
         if player.id in rnd.answers:
             raise GameError("already_answered", "one answer per question")
-        rnd.answers[player.id] = Answer(hold_start=rnd.elapsed())
+        rnd.answers[player.id] = Answer(hold_start=rnd.elapsed(), simulated=player.simulated,
+                                        said=said, expect_correct=expect_correct)
         await self._hook("hold_start", rnd, player)
 
     async def audio(self, player: Player, chunk: bytes):

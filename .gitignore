@@ -6,3 +6,4 @@ clips/
 # scripts/tunnel.sh: downloaded cloudflared, current tunnel URL
 tools/
 .tunnel_url
+reports/

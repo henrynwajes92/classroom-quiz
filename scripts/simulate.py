@@ -177,7 +177,8 @@ class SimPlayer:
         try:
             async with websockets.connect(f"{self.sim.server}/ws/play", open_timeout=10) as ws:
                 self.ws = ws
-                await ws.send(json.dumps({"type": "join", "room": self.sim.room, "name": self.name}))
+                await ws.send(json.dumps({"type": "join", "room": self.sim.room, "name": self.name,
+                                          "simulated": True}))
                 await self.read_loop(ws)
         except websockets.ConnectionClosed as e:
             self.error(self.current_round(), f"disconnected (code {e.rcvd.code if e.rcvd else 1006})")
@@ -269,7 +270,8 @@ class SimPlayer:
                 return
             a["delay_s"] = round(delay, 3)
             a["stream_likely_ready"] = delay >= READY_DELAY
-            await ws.send(json.dumps({"type": "hold_start"}))
+            await ws.send(json.dumps({"type": "hold_start", "said": clip["text"],
+                                      "expect_correct": clip["correct"]}))
             start = time.monotonic()
             for i in range(0, len(pcm), CHUNK):
                 if not self.round_open:

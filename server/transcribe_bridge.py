@@ -57,7 +57,11 @@ stops using context. Only gen1 models support it: for any other model id the
 setting is ignored (with a warning). On the demo server's gen1 model this
 turned "Civic" into "Pacific" and "No" into "Nile" for bare answers.
 
-``bridge.metrics`` holds one ``StreamMetrics`` per stream, for CQ-10.
+Metrics (CQ-10): every stream keeps a ``StreamMetrics`` timeline. When a
+round has ended and all its streams are done, the bridge passes them to its
+``recorder`` (``server/metrics.py``), which writes the report; each reported
+answer also goes to ``recorder.stream_reported`` at once. ``bridge.metrics``
+keeps the last ``METRICS_KEEP`` timelines for tests and debugging.
 """
 import asyncio
 import base64
@@ -86,6 +90,8 @@ CONTEXT_MAX_FAILURES = 2  # failed or too-slow compiles before the bridge stops 
 DEMO_HOST = "demo.cobaltspeech.com"
 DEMO_MAX_STREAMS = 4
 NORMAL_CLOSE_CODES = (1000, 1006)  # 1006: the demo server never sends a close frame
+METRICS_KEEP = 500      # timelines kept in bridge.metrics (the recorder has its own)
+REPORT_SLACK = CONNECT_TIMEOUT + 5  # report backstop: final_timeout + this after round_ended
 
 # Error codes sent to the player in "final" (see docs/protocol.md).
 ERR_UNAVAILABLE = "transcribe_unavailable"  # no stream: connect failed or demo cap reached
@@ -193,6 +199,7 @@ class StreamMetrics:
     first_audio: float | None = None       # first chunk from the player reached the bridge
     first_audio_sent: float | None = None  # ... and was sent to Transcribe (later if buffered)
     hold_end: float | None = None          # player released, or the round cut them off
+    open_streams_at_hold_end: int | None = None  # stream tasks (connecting or open) in this process at hold_end
     backlog_at_release_s: float | None = None  # audio not yet sent to Transcribe at hold_end
     end_sent: float | None = None          # empty audio message sent to Transcribe
     first_partial: float | None = None
@@ -238,13 +245,23 @@ class StreamMetrics:
     def end_to_final_s(self):
         """End of audio sent -> last final. Transcribe's own answer latency
         only for a live stream (``ready_at_hold_start`` and no backlog);
-        otherwise it includes catching up on audio that was sent in a burst."""
-        return self._span(self.end_sent, self.last_final)
+        otherwise it includes catching up on audio that was sent in a burst.
+        0 when the last final came before the end of audio (Transcribe
+        endpointed while the player was still holding)."""
+        span = self._span(self.end_sent, self.last_final)
+        return max(0.0, span) if span is not None else None
+
+    @property
+    def final_before_end(self) -> bool:
+        return self.last_final is not None and self.end_sent is not None and self.last_final < self.end_sent
 
     @property
     def quiet_wait_s(self):
-        """Last final -> reported: the quiet gap (or the wait for the close)."""
-        return self._span(self.last_final, self.reported)
+        """max(last final, end of audio sent) -> reported: the quiet gap (or
+        the wait for the close). Keeps the three parts adding up."""
+        if self.last_final is None or self.end_sent is None:
+            return None
+        return self._span(max(self.last_final, self.end_sent), self.reported)
 
     @property
     def close_delay_s(self):
@@ -303,6 +320,7 @@ class Stream:
             return
         self.ended = True
         self.m.hold_end = time.monotonic()
+        self.m.open_streams_at_hold_end = self.bridge.open_count()
         self.m.backlog_at_release_s = self.unsent_bytes / config.BYTES_PER_SEC
         self.queue.put_nowait(None)
         self.deadline = asyncio.get_running_loop().time() + self.bridge.final_timeout
@@ -316,6 +334,7 @@ class Stream:
             return
         if not self.reported:
             self.m.outcome = outcome
+        self.m.close_reason = f"closed by the bridge ({outcome})"  # no close_code: Transcribe didn't close it
         self.reported = True  # nothing (more) to report
         self._release_slot()  # at once: the next question's streams may be waiting
         self.task.cancel()
@@ -401,6 +420,8 @@ class Stream:
                     self._ending = True
                     await ws.send(END_OF_AUDIO)
                     self.m.end_sent = time.monotonic()
+                    if self.finals and self._quiet is None and not self.reported:
+                        self._arm_quiet()  # final came before the end of audio: don't wait for the close
                     return
                 await ws.send(json.dumps({"audio": {"data": base64.b64encode(chunk).decode()}}))
                 self.unsent_bytes -= len(chunk)
@@ -491,6 +512,8 @@ class Stream:
         self.m.report_trigger = trigger or self.trigger
         text, error = self.result
         self._safe(self.room.on_final, self.rnd, self.player, text, error)
+        if self.bridge.recorder is not None:
+            self._safe(self.bridge.recorder.stream_reported, self.room, self.rnd, self.m)
 
     def _safe(self, fn, *args):
         try:
@@ -516,7 +539,7 @@ class TranscribeBridge(Bridge):
     def __init__(self, url: str | None = None, model: str | None = None,
                  limit: StreamLimit | None | str = "default", final_timeout: float = FINAL_TIMEOUT,
                  quiet_gap: float | None = None, slot_wait: float = CONNECT_TIMEOUT,
-                 context: bool | None = None, context_url: str | None = None):
+                 context: bool | None = None, context_url: str | None = None, recorder=None):
         self.url = url or config.TRANSCRIBE_URL
         self.model = model or config.TRANSCRIBE_MODEL
         self.use_context = config.RECOGNITION_CONTEXT if context is None else context
@@ -535,6 +558,9 @@ class TranscribeBridge(Bridge):
         self.streams: dict[tuple[str, str], Stream] = {}  # (room code, player id) -> current stream
         self.tasks: set[asyncio.Task] = set()             # every stream task still running
         self.metrics: list[StreamMetrics] = []
+        self.recorder = recorder  # MetricsRecorder, or None for no reports
+        self.round_streams: dict[tuple[str, int], list[Stream]] = {}  # (room, round) -> its streams
+        self.reports: set[asyncio.Task] = set()  # round reports waiting for their streams
 
     def open_count(self) -> int:
         return len(self.tasks)
@@ -551,6 +577,8 @@ class TranscribeBridge(Bridge):
         stream = Stream(self, room, rnd, player)
         self.streams[key] = stream
         self.metrics.append(stream.m)
+        del self.metrics[:-METRICS_KEEP]
+        self.round_streams.setdefault((room.code, rnd.number), []).append(stream)
         self.tasks.add(stream.task)
         stream.task.add_done_callback(lambda task: self._task_done(key, stream))
         return stream
@@ -664,6 +692,25 @@ class TranscribeBridge(Bridge):
             if key[0] == room.code and stream.rnd is rnd and not stream.held:
                 stream.close("unused")
                 del self.streams[key]
+        streams = self.round_streams.pop((room.code, rnd.number), [])
+        if self.recorder is not None and streams:
+            task = asyncio.create_task(self._report_round(room, rnd, streams))
+            self.reports.add(task)
+            task.add_done_callback(self.reports.discard)
+
+    async def _report_round(self, room, rnd, streams: list[Stream]):
+        """Once the round's streams have finished (each is bounded by its own
+        timeouts; final_timeout + REPORT_SLACK is a backstop), hand their metrics to the recorder."""
+        pending = [s.task for s in streams if not s.task.done()]
+        if pending:
+            _, late = await asyncio.wait(pending, timeout=self.final_timeout + REPORT_SLACK)
+            if late:
+                log.warning("room %s round %d: reporting with %d streams still open",
+                            room.code, rnd.number, len(late))
+        try:
+            self.recorder.round_done(room, rnd, [s.m for s in streams])
+        except Exception:
+            log.exception("room %s round %d: metrics report failed", room.code, rnd.number)
 
     async def player_left(self, room, player):
         stream = self.streams.pop((room.code, player.id), None)
@@ -675,7 +722,7 @@ class TranscribeBridge(Bridge):
         for stream in list(self.streams.values()):
             stream.close("cancelled")
         self.streams.clear()
-        tasks = list(self.tasks) + list(self.contexts.values())
+        tasks = list(self.tasks) + list(self.contexts.values()) + list(self.reports)
         self.contexts.clear()
         for task in tasks:
             task.cancel()
