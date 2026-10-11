@@ -1,0 +1,81 @@
+{
+ "summary": {
+  "rows": 1,
+  "answers": 1,
+  "errors": 0,
+  "error_rate": 0.0,
+  "error_codes": {},
+  "cut_off": 0,
+  "retried": 0,
+  "connect_s": {
+   "count": 1,
+   "p50": 0.91,
+   "p95": 0.91,
+   "max": 0.91
+  },
+  "answer_latency_s": {
+   "count": 1,
+   "p50": 0.847,
+   "p95": 0.847,
+   "max": 0.847
+  },
+  "api_latency_s": {
+   "count": 1,
+   "p50": 0.344,
+   "p95": 0.344,
+   "max": 0.344
+  },
+  "correct": 1,
+  "scored": 1,
+  "correct_rate": 1.0,
+  "dropped_after_answer": 0,
+  "sim_scored": 1,
+  "mean_wer": 0.0,
+  "scorer_agrees": 1.0
+ },
+ "streams": [
+  {
+   "room": "JFSF",
+   "round": 3,
+   "question_id": "largest-ocean",
+   "player_id": "p1",
+   "player": "L1-01 (LTTS_8797)",
+   "simulated": true,
+   "attempts": 1,
+   "outcome": "final",
+   "error": null,
+   "error_detail": null,
+   "report_trigger": "quiet_gap",
+   "close_code": 1006,
+   "close_reason": null,
+   "context": false,
+   "round_streams": 1,
+   "open_streams_at_release": 1,
+   "ready_at_hold_start": true,
+   "cut_off": false,
+   "connect_s": 0.91,
+   "slot_wait_s": 0.005,
+   "answer_latency_s": 0.847,
+   "send_backlog_s": 0.001,
+   "end_to_final_s": 0.344,
+   "quiet_wait_s": 0.501,
+   "api_latency_s": 0.344,
+   "first_partial_s": 1.429,
+   "close_delay_s": 1.497,
+   "backlog_at_release_s": 0.0,
+   "audio_s": 1.811,
+   "partials": 2,
+   "finals": 1,
+   "late_finals": 0,
+   "transcript": "The Pacific Ocean. I think.",
+   "said": "The Pacific Ocean, I think",
+   "expected_answer": "pacific",
+   "correct": true,
+   "expect_correct": true,
+   "points": 82,
+   "wer": 0.0,
+   "post_report_error": null,
+   "started_at": "2026-10-11T20:33:52.164"
+  }
+ ]
+}

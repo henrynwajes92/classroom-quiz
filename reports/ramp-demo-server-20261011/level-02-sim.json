@@ -1,0 +1,329 @@
+{
+ "server": "ws://127.0.0.1:8768",
+ "room": "LPMH",
+ "seed": 7,
+ "correct_rate": 0.75,
+ "ready_delay_s": 3.0,
+ "rounds": [
+  {
+   "round": 1,
+   "question_id": "france-capital",
+   "reason": "host",
+   "answered": 2,
+   "players": 2
+  },
+  {
+   "round": 2,
+   "question_id": "red-planet",
+   "reason": "host",
+   "answered": 2,
+   "players": 2
+  },
+  {
+   "round": 3,
+   "question_id": "largest-ocean",
+   "reason": "host",
+   "answered": 2,
+   "players": 2
+  }
+ ],
+ "host_error": null,
+ "interrupted": false,
+ "metrics_summary": {
+  "type": "metrics_summary",
+  "round": 3,
+  "report": "level-02-room",
+  "this_round": {
+   "rows": 2,
+   "answers": 2,
+   "errors": 0,
+   "error_rate": 0.0,
+   "error_codes": {},
+   "cut_off": 0,
+   "retried": 0,
+   "connect_s": {
+    "count": 2,
+    "p50": 0.999,
+    "p95": 1.0,
+    "max": 1.0
+   },
+   "answer_latency_s": {
+    "count": 2,
+    "p50": 0.827,
+    "p95": 0.855,
+    "max": 0.855
+   },
+   "api_latency_s": {
+    "count": 2,
+    "p50": 0.325,
+    "p95": 0.353,
+    "max": 0.353
+   },
+   "correct": 2,
+   "scored": 2,
+   "correct_rate": 1.0,
+   "dropped_after_answer": 0,
+   "sim_scored": 2,
+   "mean_wer": 0.0,
+   "scorer_agrees": 1.0
+  },
+  "by_streams": [
+   {
+    "round_streams": 2,
+    "rounds": 3,
+    "rows": 6,
+    "answers": 6,
+    "errors": 0,
+    "error_rate": 0.0,
+    "error_codes": {},
+    "cut_off": 0,
+    "retried": 0,
+    "connect_s": {
+     "count": 6,
+     "p50": 0.762,
+     "p95": 1.0,
+     "max": 1.0
+    },
+    "answer_latency_s": {
+     "count": 6,
+     "p50": 0.798,
+     "p95": 0.855,
+     "max": 0.855
+    },
+    "api_latency_s": {
+     "count": 6,
+     "p50": 0.296,
+     "p95": 0.353,
+     "max": 0.353
+    },
+    "correct": 5,
+    "scored": 6,
+    "correct_rate": 0.833,
+    "dropped_after_answer": 0,
+    "sim_scored": 6,
+    "mean_wer": 0.0,
+    "scorer_agrees": 1.0
+   },
+   {
+    "round_streams": "all",
+    "rounds": 3,
+    "rows": 6,
+    "answers": 6,
+    "errors": 0,
+    "error_rate": 0.0,
+    "error_codes": {},
+    "cut_off": 0,
+    "retried": 0,
+    "connect_s": {
+     "count": 6,
+     "p50": 0.762,
+     "p95": 1.0,
+     "max": 1.0
+    },
+    "answer_latency_s": {
+     "count": 6,
+     "p50": 0.798,
+     "p95": 0.855,
+     "max": 0.855
+    },
+    "api_latency_s": {
+     "count": 6,
+     "p50": 0.296,
+     "p95": 0.353,
+     "max": 0.353
+    },
+    "correct": 5,
+    "scored": 6,
+    "correct_rate": 0.833,
+    "dropped_after_answer": 0,
+    "sim_scored": 6,
+    "mean_wer": 0.0,
+    "scorer_agrees": 1.0
+   }
+  ]
+ },
+ "players": [
+  {
+   "name": "L2-01 (LTTS_8797)",
+   "player_id": "p1",
+   "voice": "LTTS_8797",
+   "joined": true,
+   "answers_sent": 3,
+   "results": 3,
+   "correct": 2,
+   "error_finals": 0,
+   "errors": 0,
+   "latency_ready": {
+    "count": 3,
+    "p50": 0.805,
+    "p95": 0.859,
+    "max": 0.859
+   },
+   "latency_early": {
+    "count": 0,
+    "p50": null,
+    "p95": null,
+    "max": null
+   },
+   "answers": [
+    {
+     "round": 1,
+     "question_id": "france-capital",
+     "clip": "clips/france-capital/08_LTTS_8797.wav",
+     "clip_text": "London",
+     "expected_correct": false,
+     "delay_s": 3.725,
+     "audio_s": 0.7,
+     "stream_likely_ready": true,
+     "cut_off": false,
+     "partials": 0,
+     "text": "London.",
+     "correct": false,
+     "points": 0,
+     "score": 0,
+     "error": null,
+     "latency_s": 0.805
+    },
+    {
+     "round": 2,
+     "question_id": "red-planet",
+     "clip": "clips/red-planet/00_LTTS_8797.wav",
+     "clip_text": "Mars",
+     "expected_correct": true,
+     "delay_s": 3.779,
+     "audio_s": 0.84,
+     "stream_likely_ready": true,
+     "cut_off": false,
+     "partials": 0,
+     "text": "Mars.",
+     "correct": true,
+     "points": 86,
+     "score": 86,
+     "error": null,
+     "latency_s": 0.784
+    },
+    {
+     "round": 3,
+     "question_id": "largest-ocean",
+     "clip": "clips/largest-ocean/07_LTTS_8797.wav",
+     "clip_text": "The Pacific Ocean, I think",
+     "expected_correct": true,
+     "delay_s": 4.06,
+     "audio_s": 1.81,
+     "stream_likely_ready": true,
+     "cut_off": false,
+     "partials": 2,
+     "text": "The Pacific Ocean. I think.",
+     "correct": true,
+     "points": 83,
+     "score": 169,
+     "error": null,
+     "latency_s": 0.859
+    }
+   ],
+   "error_log": []
+  },
+  {
+   "name": "L2-02 (cobalt_steve)",
+   "player_id": "p2",
+   "voice": "cobalt_steve",
+   "joined": true,
+   "answers_sent": 3,
+   "results": 3,
+   "correct": 3,
+   "error_finals": 0,
+   "errors": 0,
+   "latency_ready": {
+    "count": 3,
+    "p50": 0.813,
+    "p95": 0.833,
+    "max": 0.833
+   },
+   "latency_early": {
+    "count": 0,
+    "p50": null,
+    "p95": null,
+    "max": null
+   },
+   "answers": [
+    {
+     "round": 1,
+     "question_id": "france-capital",
+     "clip": "clips/france-capital/00_cobalt_steve.wav",
+     "clip_text": "Paris",
+     "expected_correct": true,
+     "delay_s": 4.824,
+     "audio_s": 0.7,
+     "stream_likely_ready": true,
+     "cut_off": false,
+     "partials": 0,
+     "text": "Paris.",
+     "correct": true,
+     "points": 84,
+     "score": 84,
+     "error": null,
+     "latency_s": 0.796
+    },
+    {
+     "round": 2,
+     "question_id": "red-planet",
+     "clip": "clips/red-planet/07_cobalt_steve.wav",
+     "clip_text": "The planet Mars, I think",
+     "expected_correct": true,
+     "delay_s": 4.642,
+     "audio_s": 1.95,
+     "stream_likely_ready": true,
+     "cut_off": false,
+     "partials": 2,
+     "text": "The planet Mars. I think",
+     "correct": true,
+     "points": 81,
+     "score": 165,
+     "error": null,
+     "latency_s": 0.813
+    },
+    {
+     "round": 3,
+     "question_id": "largest-ocean",
+     "clip": "clips/largest-ocean/06_cobalt_steve.wav",
+     "clip_text": "The Pacific",
+     "expected_correct": true,
+     "delay_s": 4.043,
+     "audio_s": 1.11,
+     "stream_likely_ready": true,
+     "cut_off": false,
+     "partials": 1,
+     "text": "The Pacific.",
+     "correct": true,
+     "points": 84,
+     "score": 249,
+     "error": null,
+     "latency_s": 0.833
+    }
+   ],
+   "error_log": []
+  }
+ ],
+ "aggregate": {
+  "players": 2,
+  "joined": 2,
+  "answers_sent": 6,
+  "results": 6,
+  "correct": 5,
+  "expected_correct": 5,
+  "error_finals": 0,
+  "errors": 0,
+  "latency_ready": {
+   "count": 6,
+   "p50": 0.805,
+   "p95": 0.859,
+   "max": 0.859
+  },
+  "latency_early": {
+   "count": 0,
+   "p50": null,
+   "p95": null,
+   "max": null
+  }
+ }
+}

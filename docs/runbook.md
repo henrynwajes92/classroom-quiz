@@ -83,3 +83,42 @@ Record the host screen at 1920×1080 (browser full screen, F11).
    what we'd test next.
 
 Post the video and `reports/ramp-<date>/` before Wednesday's meeting.
+
+## Plan B: no answer from ops, a 4-stream demo on the demo server
+
+Every player, real or simulated, is one Transcribe stream, and the shared
+demo server keeps up with ~4. So the backup demo is **4 players in total**:
+2 phones + 2 simulated players. Everything else is the same.
+
+**Evidence, already done:** `reports/ramp-demo-server-20261011/` holds a
+ramp at 1, 2, 3 and 4 players, 3 rounds each, on the demo server. Results:
+0 errors at every level, answer latency p50 0.80-0.85 s / p95 0.84-0.91 s,
+Transcribe end-of-audio to final p50 0.29-0.34 s, connect p95 ≤ 1.0 s,
+scorer agreed with every clip. Chart: `ramp.svg` in that folder.
+
+**Live game:**
+
+```sh
+scripts/tunnel.sh                    # server (demo Transcribe) + https link + QR
+# open http://localhost:8000/host, note the room code, 2 people join by QR
+.venv/bin/python scripts/simulate.py --players 2 --room CODE --server ws://localhost:8000 --rounds 5
+```
+
+Keep it at **4 players total**: a 5th would wait for a free stream and
+then get "couldn't hear you" (`transcribe_unavailable`), which looks broken
+on camera. Don't override the cap (`--i-asked-ops`, `ALLOW_DEMO_LOAD=1`)
+on the demo server.
+
+**Video outline (5 minutes):** as in §4, with these changes.
+- **Join:** 2 phones + 2 simulated players.
+- **The evidence:** the 1-4 player chart. Say: "Latency stays flat from 1
+  to 4 concurrent streams, with no errors. The shared demo server is sized
+  for about 4 streams, so that is where this run stops. The 35-player run
+  is the same command against a dedicated instance:
+  `scripts/ramp.py --levels 1,5,10,20,35`."
+- **Wrap-up:** what's next is the 35-stream run once an instance is
+  available. Everything for it (simulator, report, chart) is built and
+  tested.
+
+If ops comes through later, run §2 and §3 and re-record with the full
+ramp; nothing else changes.

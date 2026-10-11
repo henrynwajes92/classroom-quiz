@@ -1,0 +1,76 @@
+{
+ "by_streams": [
+  {
+   "round_streams": 3,
+   "rounds": 3,
+   "rows": 9,
+   "answers": 9,
+   "errors": 0,
+   "error_rate": 0.0,
+   "error_codes": {},
+   "cut_off": 0,
+   "retried": 0,
+   "connect_s": {
+    "count": 9,
+    "p50": 0.739,
+    "p95": 0.778,
+    "max": 0.778
+   },
+   "answer_latency_s": {
+    "count": 9,
+    "p50": 0.797,
+    "p95": 0.842,
+    "max": 0.842
+   },
+   "api_latency_s": {
+    "count": 9,
+    "p50": 0.293,
+    "p95": 0.34,
+    "max": 0.34
+   },
+   "correct": 7,
+   "scored": 9,
+   "correct_rate": 0.778,
+   "dropped_after_answer": 0,
+   "sim_scored": 9,
+   "mean_wer": 0.0,
+   "scorer_agrees": 1.0
+  },
+  {
+   "round_streams": "all",
+   "rounds": 3,
+   "rows": 9,
+   "answers": 9,
+   "errors": 0,
+   "error_rate": 0.0,
+   "error_codes": {},
+   "cut_off": 0,
+   "retried": 0,
+   "connect_s": {
+    "count": 9,
+    "p50": 0.739,
+    "p95": 0.778,
+    "max": 0.778
+   },
+   "answer_latency_s": {
+    "count": 9,
+    "p50": 0.797,
+    "p95": 0.842,
+    "max": 0.842
+   },
+   "api_latency_s": {
+    "count": 9,
+    "p50": 0.293,
+    "p95": 0.34,
+    "max": 0.34
+   },
+   "correct": 7,
+   "scored": 9,
+   "correct_rate": 0.778,
+   "dropped_after_answer": 0,
+   "sim_scored": 9,
+   "mean_wer": 0.0,
+   "scorer_agrees": 1.0
+  }
+ ]
+}

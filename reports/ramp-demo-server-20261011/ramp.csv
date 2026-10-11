@@ -1,0 +1,5 @@
+players,source,room,rounds,joined,answers,errors,error_rate,error_codes,cut_off,connect_p50,connect_p95,answer_n,answer_p50,answer_p95,answer_max,api_n,api_p50,api_p95,api_max,client_answer_n,client_answer_p50,client_answer_p95,correct,scored,correct_rate,mean_wer,scorer_agrees,host_error,report
+1,server,JFSF,3,1,3,0,0.0,,0,0.902,0.91,3,0.847,0.911,0.911,3,0.344,0.408,0.408,3,0.852,0.916,2,3,0.667,0.0,1.0,,level-01-room
+2,server,LPMH,3,2,6,0,0.0,,0,0.762,1.0,6,0.798,0.855,0.855,6,0.296,0.353,0.353,6,0.805,0.859,5,6,0.833,0.0,1.0,,level-02-room
+3,server,FXEK,3,3,9,0,0.0,,0,0.739,0.778,9,0.797,0.842,0.842,9,0.293,0.34,0.34,9,0.801,0.848,7,9,0.778,0.0,1.0,,level-03-room
+4,server,NSCK,3,4,12,0,0.0,,0,0.806,0.83,12,0.802,0.851,0.851,12,0.299,0.35,0.35,12,0.807,0.857,9,12,0.75,0.0,1.0,,level-04-room

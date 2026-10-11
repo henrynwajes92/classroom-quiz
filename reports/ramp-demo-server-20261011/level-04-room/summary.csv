@@ -1,0 +1,3 @@
+round_streams,rounds,rows,answers,errors,error_rate,cut_off,retried,connect_p50,connect_p95,connect_max,answer_n,answer_p50,answer_p95,answer_max,api_n,api_p50,api_p95,api_max,correct,scored,correct_rate,sim_scored,mean_wer,scorer_agrees,dropped_after_answer,error_codes
+4,3,12,12,0,0.0,0,0,0.806,0.83,0.83,12,0.802,0.851,0.851,12,0.299,0.35,0.35,9,12,0.75,12,0.0,1.0,0,
+all,3,12,12,0,0.0,0,0,0.806,0.83,0.83,12,0.802,0.851,0.851,12,0.299,0.35,0.35,9,12,0.75,12,0.0,1.0,0,

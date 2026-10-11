@@ -1,0 +1,249 @@
+{
+ "server": "ws://127.0.0.1:8768",
+ "room": "JFSF",
+ "seed": 7,
+ "correct_rate": 0.75,
+ "ready_delay_s": 3.0,
+ "rounds": [
+  {
+   "round": 1,
+   "question_id": "france-capital",
+   "reason": "host",
+   "answered": 1,
+   "players": 1
+  },
+  {
+   "round": 2,
+   "question_id": "red-planet",
+   "reason": "host",
+   "answered": 1,
+   "players": 1
+  },
+  {
+   "round": 3,
+   "question_id": "largest-ocean",
+   "reason": "host",
+   "answered": 1,
+   "players": 1
+  }
+ ],
+ "host_error": null,
+ "interrupted": false,
+ "metrics_summary": {
+  "type": "metrics_summary",
+  "round": 3,
+  "report": "level-01-room",
+  "this_round": {
+   "rows": 1,
+   "answers": 1,
+   "errors": 0,
+   "error_rate": 0.0,
+   "error_codes": {},
+   "cut_off": 0,
+   "retried": 0,
+   "connect_s": {
+    "count": 1,
+    "p50": 0.91,
+    "p95": 0.91,
+    "max": 0.91
+   },
+   "answer_latency_s": {
+    "count": 1,
+    "p50": 0.847,
+    "p95": 0.847,
+    "max": 0.847
+   },
+   "api_latency_s": {
+    "count": 1,
+    "p50": 0.344,
+    "p95": 0.344,
+    "max": 0.344
+   },
+   "correct": 1,
+   "scored": 1,
+   "correct_rate": 1.0,
+   "dropped_after_answer": 0,
+   "sim_scored": 1,
+   "mean_wer": 0.0,
+   "scorer_agrees": 1.0
+  },
+  "by_streams": [
+   {
+    "round_streams": 1,
+    "rounds": 3,
+    "rows": 3,
+    "answers": 3,
+    "errors": 0,
+    "error_rate": 0.0,
+    "error_codes": {},
+    "cut_off": 0,
+    "retried": 0,
+    "connect_s": {
+     "count": 3,
+     "p50": 0.902,
+     "p95": 0.91,
+     "max": 0.91
+    },
+    "answer_latency_s": {
+     "count": 3,
+     "p50": 0.847,
+     "p95": 0.911,
+     "max": 0.911
+    },
+    "api_latency_s": {
+     "count": 3,
+     "p50": 0.344,
+     "p95": 0.408,
+     "max": 0.408
+    },
+    "correct": 2,
+    "scored": 3,
+    "correct_rate": 0.667,
+    "dropped_after_answer": 0,
+    "sim_scored": 3,
+    "mean_wer": 0.0,
+    "scorer_agrees": 1.0
+   },
+   {
+    "round_streams": "all",
+    "rounds": 3,
+    "rows": 3,
+    "answers": 3,
+    "errors": 0,
+    "error_rate": 0.0,
+    "error_codes": {},
+    "cut_off": 0,
+    "retried": 0,
+    "connect_s": {
+     "count": 3,
+     "p50": 0.902,
+     "p95": 0.91,
+     "max": 0.91
+    },
+    "answer_latency_s": {
+     "count": 3,
+     "p50": 0.847,
+     "p95": 0.911,
+     "max": 0.911
+    },
+    "api_latency_s": {
+     "count": 3,
+     "p50": 0.344,
+     "p95": 0.408,
+     "max": 0.408
+    },
+    "correct": 2,
+    "scored": 3,
+    "correct_rate": 0.667,
+    "dropped_after_answer": 0,
+    "sim_scored": 3,
+    "mean_wer": 0.0,
+    "scorer_agrees": 1.0
+   }
+  ]
+ },
+ "players": [
+  {
+   "name": "L1-01 (LTTS_8797)",
+   "player_id": "p1",
+   "voice": "LTTS_8797",
+   "joined": true,
+   "answers_sent": 3,
+   "results": 3,
+   "correct": 2,
+   "error_finals": 0,
+   "errors": 0,
+   "latency_ready": {
+    "count": 3,
+    "p50": 0.852,
+    "p95": 0.916,
+    "max": 0.916
+   },
+   "latency_early": {
+    "count": 0,
+    "p50": null,
+    "p95": null,
+    "max": null
+   },
+   "answers": [
+    {
+     "round": 1,
+     "question_id": "france-capital",
+     "clip": "clips/france-capital/08_LTTS_8797.wav",
+     "clip_text": "London",
+     "expected_correct": false,
+     "delay_s": 3.725,
+     "audio_s": 0.7,
+     "stream_likely_ready": true,
+     "cut_off": false,
+     "partials": 0,
+     "text": "London.",
+     "correct": false,
+     "points": 0,
+     "score": 0,
+     "error": null,
+     "latency_s": 0.916
+    },
+    {
+     "round": 2,
+     "question_id": "red-planet",
+     "clip": "clips/red-planet/00_LTTS_8797.wav",
+     "clip_text": "Mars",
+     "expected_correct": true,
+     "delay_s": 3.779,
+     "audio_s": 0.84,
+     "stream_likely_ready": true,
+     "cut_off": false,
+     "partials": 0,
+     "text": "Mars.",
+     "correct": true,
+     "points": 86,
+     "score": 86,
+     "error": null,
+     "latency_s": 0.776
+    },
+    {
+     "round": 3,
+     "question_id": "largest-ocean",
+     "clip": "clips/largest-ocean/07_LTTS_8797.wav",
+     "clip_text": "The Pacific Ocean, I think",
+     "expected_correct": true,
+     "delay_s": 4.06,
+     "audio_s": 1.81,
+     "stream_likely_ready": true,
+     "cut_off": false,
+     "partials": 2,
+     "text": "The Pacific Ocean. I think.",
+     "correct": true,
+     "points": 82,
+     "score": 168,
+     "error": null,
+     "latency_s": 0.852
+    }
+   ],
+   "error_log": []
+  }
+ ],
+ "aggregate": {
+  "players": 1,
+  "joined": 1,
+  "answers_sent": 3,
+  "results": 3,
+  "correct": 2,
+  "expected_correct": 2,
+  "error_finals": 0,
+  "errors": 0,
+  "latency_ready": {
+   "count": 3,
+   "p50": 0.852,
+   "p95": 0.916,
+   "max": 0.916
+  },
+  "latency_early": {
+   "count": 0,
+   "p50": null,
+   "p95": null,
+   "max": null
+  }
+ }
+}
