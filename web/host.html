@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Classroom Quiz Host</title>
+<link rel="stylesheet" href="/static/host.css">
+</head>
+<body>
+<header>
+  <span class="brand">Classroom Quiz</span>
+  <span class="room">Room <b id="room-code">····</b></span>
+  <span id="players" class="pill">0 players</span>
+  <span id="transcribe" class="pill muted">Transcribe: …</span>
+  <span id="conn" class="pill bad" hidden>Disconnected</span>
+</header>
+
+<main>
+  <section class="left">
+    <div class="card question">
+      <div class="qmeta">
+        <span id="q-num">Waiting to start</span>
+        <span id="q-answers"></span>
+        <span id="q-timer" class="timer"></span>
+      </div>
+      <div class="timebar"><div id="q-timebar"></div></div>
+      <h1 id="q-text">Join on your phone, then press <kbd>Start</kbd>.</h1>
+      <p id="q-reveal" class="reveal" hidden></p>
+      <div class="controls">
+        <button id="btn-next" class="primary" disabled>Start question</button>
+        <button id="btn-end" disabled>End round</button>
+        <label class="limit">Time <input id="time-limit" type="number" min="3" max="120" step="1"> s</label>
+        <span class="keys"><kbd>N</kbd> next · <kbd>E</kbd> end</span>
+      </div>
+    </div>
+
+    <div class="card board">
+      <h2>Leaderboard <span class="legend"><span class="tag real">phone</span> real player</span></h2>
+      <ol id="board"></ol>
+      <p id="board-empty" class="muted">No players yet.</p>
+    </div>
+  </section>
+
+  <section class="right">
+    <div class="card join" id="join">
+      <img id="qr" alt="QR code to join" width="220" height="220">
+      <div>
+        <p class="muted">Scan or open</p>
+        <p id="join-url" class="url"></p>
+        <p id="join-warn" class="warn" hidden>Not https: phone mics won't work. Run <code>scripts/tunnel.sh</code>.</p>
+      </div>
+    </div>
+
+    <div class="card metrics">
+      <h2>Transcribe under load <span id="m-scope" class="muted small">this round</span></h2>
+      <div class="tiles">
+        <div class="tile"><span class="v" id="m-streams">–</span><span class="k">streams open</span></div>
+        <div class="tile"><span class="v" id="m-p50">–</span><span class="k">answer p50</span></div>
+        <div class="tile"><span class="v" id="m-p95">–</span><span class="k">answer p95</span></div>
+        <div class="tile"><span class="v" id="m-api">–</span><span class="k">API p50</span></div>
+        <div class="tile"><span class="v" id="m-errors">–</span><span class="k">errors</span></div>
+        <div class="tile"><span class="v" id="m-wer">–</span><span class="k">word accuracy</span></div>
+      </div>
+      <table id="by-streams" hidden>
+        <thead><tr><th>players</th><th>rounds</th><th>answers</th><th>p50</th><th>p95</th><th>API p50</th><th>errors</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="muted small">Answer = release → scored. API = Transcribe end-of-audio → final, streams ready in time. Word accuracy = 1 − WER of simulated players.</p>
+    </div>
+
+    <div class="card feed">
+      <h2>Answers</h2>
+      <ul id="feed"></ul>
+    </div>
+  </section>
+</main>
+
+<script src="/static/host.js"></script>
+</body>
+</html>

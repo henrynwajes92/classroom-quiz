@@ -57,3 +57,21 @@ def test_static_no_escape(client):
 
 def test_health_still_works(client):
     assert client.get("/health").json()["ok"] is True
+
+
+def test_host_page_and_join_link(client, tmp_path, monkeypatch):
+    from server import config
+    r = client.get("/host")
+    assert r.status_code == 200 and 'id="room-code"' in r.text and "/static/host.js" in r.text
+    monkeypatch.setattr(config, "TUNNEL_URL_FILE", tmp_path / "none")
+    info = client.get("/join-info", params={"room": "kxqb"}).json()
+    assert info == {"url": "http://testserver/play?room=KXQB", "https": False, "tunnel": False}
+    assert client.get("/join-info", params={"room": "<b>"}).json()["url"] == "http://testserver/play"
+    (tmp_path / "tunnel").write_text("https://abc-def.trycloudflare.com\n")
+    monkeypatch.setattr(config, "TUNNEL_URL_FILE", tmp_path / "tunnel")
+    info = client.get("/join-info", params={"room": "KXQB"}).json()
+    assert info == {"url": "https://abc-def.trycloudflare.com/play?room=KXQB", "https": True, "tunnel": True}
+    (tmp_path / "tunnel").write_text("javascript:alert(1)")
+    assert client.get("/join-info").json()["tunnel"] is False  # anything odd in the file is ignored
+    qr = client.get("/join-qr.svg", params={"room": "KXQB"})
+    assert qr.headers["content-type"] == "image/svg+xml" and qr.text.lstrip().startswith(("<?xml", "<svg"))

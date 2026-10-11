@@ -23,7 +23,10 @@ or unrecognised answers score 0.
 |---|---|---|
 | `ws://<server>/ws/host` | host screen | Connecting **creates a room**. One host per room. When the host disconnects, the room closes. |
 | `ws://<server>/ws/play` | phones, simulator | First message must be `join`. One player per connection. |
-| `GET /health` | anyone | `{"ok": true, "rooms": 1, "players": 35}` |
+| `GET /health` | anyone | `{"ok": true, "rooms": 1, "players": 35, "transcribe": {"host": "demo.cobaltspeech.com", "stream_cap": 4, "open_streams": 12}}`; `open_streams` (Transcribe stream tasks now) only with the Transcribe bridge |
+| `GET /host` | browser | Host screen (`web/host.html`): opens `/ws/host`, so it creates a room |
+| `GET /join-info?room=KXQB` | host screen | `{"url": "https://….trycloudflare.com/play?room=KXQB", "https": true, "tunnel": true}`: the phone link, from `.tunnel_url` (`scripts/tunnel.sh`) or else this server's address |
+| `GET /join-qr.svg?room=KXQB` | host screen | QR code of that link |
 
 Use `wss://` when the server is behind HTTPS (phones need it for the mic).
 
@@ -284,13 +287,15 @@ comes `FINAL_QUIET_GAP`, 0.5 s, after Transcribe's last result), after each
 
 ```json
 {"type": "leaderboard", "round": 3, "players": [
-  {"player_id": "p7", "name": "Alice", "score": 263, "rank": 1, "round_points": 88},
-  {"player_id": "p2", "name": "Bob", "score": 200, "rank": 2, "round_points": 0},
-  {"player_id": "p9", "name": "Cara", "score": 200, "rank": 2, "round_points": 95}
+  {"player_id": "p7", "name": "Alice", "score": 263, "rank": 1, "round_points": 88, "simulated": false},
+  {"player_id": "p2", "name": "Bob", "score": 200, "rank": 2, "round_points": 0, "simulated": false},
+  {"player_id": "p9", "name": "Sim-03", "score": 200, "rank": 2, "round_points": 95, "simulated": true}
 ]}
 ```
 `rank` starts at 1; equal scores share a rank (1, 2, 2, 4). `round` is the
-current (or last finished) round, `null` before the first; `round_points` is
+current (or last finished) round, `null` before the first; `simulated` is
+true for players who joined with `"simulated": true` (the host screen tags
+the others as real phone players); `round_points` is
 what the player has scored in it so far (0 if not answered or not scored yet).
 
 ### `round_end` (→ host and all players)

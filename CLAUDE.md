@@ -55,6 +55,10 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 # run the game server (host: ws://<ip>:8000/ws/host, players: /ws/play)
 .venv/bin/uvicorn server.app:app --host 0.0.0.0 --port 8000
+# host screen: open http://localhost:8000/host on the laptop/projector (it creates
+# the room; shows join QR, leaderboard, live metrics; N = next question, E = end round).
+# For phones run scripts/tunnel.sh too: the host screen then shows the https link.
+# Simulated players join that room with: scripts/simulate.py --room CODE --players 4
 
 # tests (no Cobalt calls; Transcribe is faked by a local WebSocket server)
 .venv/bin/python -m pytest -q

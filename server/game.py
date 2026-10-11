@@ -189,7 +189,7 @@ class Room:
                 rank = i + 1
             a = answers.get(p.id)
             rows.append({"player_id": p.id, "name": p.name, "score": p.score, "rank": rank,
-                         "round_points": a.points if a else 0})
+                         "round_points": a.points if a else 0, "simulated": p.simulated})
         return {"type": "leaderboard", "round": self.round.number if self.round else None,
                 "players": rows}
 

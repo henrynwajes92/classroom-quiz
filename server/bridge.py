@@ -60,7 +60,8 @@ class Bridge:
 
     def status(self) -> dict | None:
         """For /health: {"host": Transcribe host or None, "stream_cap": max
-        concurrent streams or None}. None means unknown."""
+        concurrent streams or None, optionally "open_streams": stream tasks
+        now}. None means unknown."""
         return None
 
 

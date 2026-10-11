@@ -5,7 +5,9 @@
 /ws/host  one per room; connecting creates the room
 /ws/play  players (phones and simulator); first message must be "join"
 /, /play  the phone page (web/play.html); /play?room=KXQB pre-fills the room
-/static/  the phone page's JS/CSS (web/)
+/host     the host screen (web/host.html): creates a room over /ws/host
+/join-info?room=KXQB, /join-qr.svg?room=KXQB  phone join link and its QR code
+/static/  the pages' JS/CSS (web/)
 
 The message contract is in docs/protocol.md.
 """
@@ -14,11 +16,13 @@ import binascii
 import json
 import logging
 import math
+import io
 import re
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket
-from fastapi.responses import HTMLResponse
+import segno
+from fastapi import FastAPI, Request, WebSocket
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import config
@@ -39,10 +43,28 @@ MAX_SAID_LEN = 200  # hold_start "said" (simulated players' clip text)
 def phone_page(room: str | None) -> str:
     """web/play.html with the room field pre-filled. Only a 4-letter code is
     used (anything else is dropped), so nothing from the URL reaches the HTML."""
+    return (WEB_DIR / "play.html").read_text(encoding="utf-8").replace("__ROOM__", clean_room(room))
+
+
+def clean_room(room: str | None) -> str:
     room = (room or "").strip().upper()
-    if not re.fullmatch(r"[A-Z]{4}", room):
-        room = ""
-    return (WEB_DIR / "play.html").read_text(encoding="utf-8").replace("__ROOM__", room)
+    return room if re.fullmatch(r"[A-Z]{4}", room) else ""
+
+
+def join_url(request: Request, room: str) -> tuple[str, bool]:
+    """The phone link for ``room`` and whether it is the public https tunnel
+    (scripts/tunnel.sh writes .tunnel_url). Without a tunnel: this server's
+    own address as the host screen reached it, which phones can only use
+    for the mic if it is https."""
+    base, public = None, False
+    try:
+        base = config.TUNNEL_URL_FILE.read_text().strip() or None
+        public = base is not None
+    except OSError:
+        pass
+    if not base or not re.fullmatch(r"https://[A-Za-z0-9.-]+(:\d+)?/?", base):
+        base, public = str(request.base_url), False
+    return f"{base.rstrip('/')}/play" + (f"?room={room}" if room else ""), public
 
 
 class NoCacheStatic(StaticFiles):
@@ -124,6 +146,22 @@ def create_app(questions: list[Question] | None = None, bridge: Bridge | None = 
     @app.get("/play", response_class=HTMLResponse)
     async def play_page(room: str | None = None):
         return HTMLResponse(phone_page(room), headers=NO_CACHE)
+
+    @app.get("/host", response_class=HTMLResponse)
+    async def host_page():
+        return HTMLResponse((WEB_DIR / "host.html").read_text(encoding="utf-8"), headers=NO_CACHE)
+
+    @app.get("/join-info")
+    async def join_info(request: Request, room: str | None = None):
+        url, public = join_url(request, clean_room(room))
+        return {"url": url, "https": url.startswith("https://"), "tunnel": public}
+
+    @app.get("/join-qr.svg")
+    async def join_qr(request: Request, room: str | None = None):
+        url, _ = join_url(request, clean_room(room))
+        buf = io.BytesIO()
+        segno.make(url, error="m").save(buf, kind="svg", scale=8, border=2, dark="#14213d", light="#ffffff")
+        return Response(buf.getvalue(), media_type="image/svg+xml", headers=NO_CACHE)
 
     app.mount("/static", NoCacheStatic(directory=WEB_DIR), name="static")
 

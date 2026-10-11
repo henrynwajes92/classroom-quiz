@@ -567,7 +567,8 @@ class TranscribeBridge(Bridge):
 
     def status(self):
         return {"host": (urlparse(self.url).hostname or "").lower().rstrip(".") or None,
-                "stream_cap": self.limit.max if self.limit else None}
+                "stream_cap": self.limit.max if self.limit else None,
+                "open_streams": self.open_count()}  # host screen's live "streams open"
 
     def _open(self, room, rnd, player) -> Stream:
         key = (room.code, player.id)
