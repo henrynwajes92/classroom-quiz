@@ -119,6 +119,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 #board .delta { color: var(--good); font-size: 0.9em; min-width: 3.2em; text-align: right;
                 font-variant-numeric: tabular-nums; }
 #board li.top .rank { color: var(--accent); font-weight: 700; }
+#board li.gone { opacity: 0.5; }
 #board li.flash { animation: flash 1.2s ease-out; }
 @keyframes flash { from { background: rgba(46, 204, 113, 0.35); } to { background: transparent; } }
 .tag { font-size: 0.65em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;

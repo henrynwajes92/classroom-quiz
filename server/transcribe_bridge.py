@@ -557,6 +557,7 @@ class TranscribeBridge(Bridge):
         self.ssl = ssl.create_default_context(cafile=certifi.where()) if self.url.startswith("wss:") else None
         self.streams: dict[tuple[str, str], Stream] = {}  # (room code, player id) -> current stream
         self.tasks: set[asyncio.Task] = set()             # every stream task still running
+        self.running: set[Stream] = set()                 # their streams
         self.metrics: list[StreamMetrics] = []
         self.recorder = recorder  # MetricsRecorder, or None for no reports
         self.round_streams: dict[tuple[str, int], list[Stream]] = {}  # (room, round) -> its streams
@@ -565,10 +566,17 @@ class TranscribeBridge(Bridge):
     def open_count(self) -> int:
         return len(self.tasks)
 
+    def connected_count(self) -> int:
+        """Streams holding a connection (or connecting) to Transcribe, i.e. past
+        the demo cap's slot and not yet closed. Streams still waiting for a
+        slot are not counted."""
+        return sum(1 for s in self.running if s.m.slot_acquired is not None and s.m.closed is None)
+
     def status(self):
         return {"host": (urlparse(self.url).hostname or "").lower().rstrip(".") or None,
                 "stream_cap": self.limit.max if self.limit else None,
-                "open_streams": self.open_count()}  # host screen's live "streams open"
+                "open_streams": self.connected_count(),  # host screen's live "streams open"
+                "waiting_streams": sum(1 for s in self.running if s.m.slot_acquired is None)}
 
     def _open(self, room, rnd, player) -> Stream:
         key = (room.code, player.id)
@@ -581,11 +589,13 @@ class TranscribeBridge(Bridge):
         del self.metrics[:-METRICS_KEEP]
         self.round_streams.setdefault((room.code, rnd.number), []).append(stream)
         self.tasks.add(stream.task)
+        self.running.add(stream)
         stream.task.add_done_callback(lambda task: self._task_done(key, stream))
         return stream
 
     def _task_done(self, key, stream: Stream):
         self.tasks.discard(stream.task)
+        self.running.discard(stream)
         if stream.m.closed is None:  # cancelled before it started
             stream.m.closed = time.monotonic()
         if stream.m.outcome == "open":

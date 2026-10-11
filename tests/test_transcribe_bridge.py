@@ -409,8 +409,8 @@ def test_leaderboard_follows_each_final_at_once():
                     assert board["type"] == "leaderboard" and t_board - t_final < 0.01
                 # Loose: a busy test machine can stall the loop (seen ~1.5 s).
                 assert bridge.quiet_gap - 0.01 <= t_final - metrics[p.id].last_final < bridge.quiet_gap + 1.5
-            for c in [room.host] + [p.client for p in players]:
-                assert sum(msg["type"] == "leaderboard" for _, msg in c.sent) == 4
+            for c in [room.host] + [p.client for p in players]:  # the host also got one per join
+                assert sum(msg["type"] == "leaderboard" for _, msg in c.sent) == (8 if c is room.host else 4)
             final_board = [msg for _, msg in room.host.sent if msg["type"] == "leaderboard"][-1]
             assert [p["score"] for p in final_board["players"]] == sorted(p.score for p in players)[::-1]
             assert all(p.score >= 95 for p in players)

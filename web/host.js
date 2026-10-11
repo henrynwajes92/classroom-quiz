@@ -5,6 +5,7 @@
 "use strict";
 
 const HEALTH_EVERY_MS = 1000;   // "streams open" and the Transcribe host come from /health
+const JOIN_EVERY_MS = 5000;     // re-check the join link until the https tunnel shows up
 const FEED_MAX = 12;
 const BOARD_MAX = 36;           // two columns of 18 fit at 1080p
 const BOARD_ONE_COLUMN = 12;    // up to this many rows: one column, read top to bottom
@@ -18,7 +19,7 @@ const el = {
   next: $("btn-next"), end: $("btn-end"), timeLimit: $("time-limit"),
   board: $("board"), boardEmpty: $("board-empty"),
   join: $("join"), qr: $("qr"), joinUrl: $("join-url"), joinWarn: $("join-warn"),
-  mStreams: $("m-streams"), mP50: $("m-p50"), mP95: $("m-p95"), mApi: $("m-api"),
+  mStreams: $("m-streams"), mStreamsK: $("m-streams-k"), mP50: $("m-p50"), mP95: $("m-p95"), mApi: $("m-api"),
   mErrors: $("m-errors"), mWer: $("m-wer"), mScope: $("m-scope"),
   byStreams: $("by-streams"), feed: $("feed"),
 };
@@ -33,6 +34,9 @@ const state = {
   lastBoard: new Map(), // player id -> score, to flash changes
   feedLat: new Map(),   // "round:player id" -> latency cell of that feed row
   timer: null,
+  joinTimer: null,
+  started: false,       // a question has been asked: players who leave stay on the board
+  known: new Map(),     // player id -> last leaderboard row, for players who left
 };
 
 // --- helpers -----------------------------------------------------------------
@@ -96,15 +100,28 @@ function onRoomCreated(msg) {
   el.next.disabled = false;
   document.title = `Quiz ${msg.room}`;
   loadJoin();
+  state.joinTimer = setInterval(loadJoin, JOIN_EVERY_MS);
 }
+
+const LOOPBACK = /^(localhost|127\.|\[::1\])/;
 
 async function loadJoin() {
   const q = `room=${encodeURIComponent(state.room)}`;
-  el.qr.src = `/join-qr.svg?${q}`;
   try {
-    const info = await (await fetch(`/join-info?${q}`)).json();
-    el.joinUrl.textContent = info.url.replace(/^https?:\/\//, "");
+    const info = await (await fetch(`/join-info?${q}`, { cache: "no-store" })).json();
+    const shown = info.url.replace(/^https?:\/\//, "");
+    if (shown !== el.joinUrl.textContent) {
+      el.joinUrl.textContent = shown;
+      el.qr.src = `/join-qr.svg?${q}&t=${Date.now()}`;  // new link (tunnel started): new QR
+    }
     el.joinWarn.hidden = info.https;
+    el.joinWarn.textContent = LOOPBACK.test(shown)
+      ? "This is the laptop's own address: phones can't reach it. Run scripts/tunnel.sh."
+      : "Not https: phone mics won't work. Run scripts/tunnel.sh.";
+    if (info.tunnel && state.joinTimer) {
+      clearInterval(state.joinTimer);
+      state.joinTimer = null;
+    }
   } catch (e) {
     el.joinUrl.textContent = `${location.host}/play?room=${state.room}`;
   }
@@ -118,6 +135,7 @@ function setPlayers(n) {
 
 function showError(msg) {
   if (msg.code === "no_round") return;  // end_round raced the timer
+  if (!state.round || !state.round.open) el.next.disabled = false;  // e.g. start_question refused: allow a retry
   el.qReveal.hidden = false;
   el.qReveal.textContent = `Server: ${msg.message}`;
 }
@@ -132,6 +150,9 @@ function onQuestion(msg) {
   state.answered.clear();
   state.live = [];
   state.feedLat.clear();
+  state.started = true;
+  el.feed.replaceChildren();  // this round's answers only: an old "Paris" under a new question reads as wrong
+  el.mWer.textContent = "–";
   el.qNum.textContent = `Question ${msg.index + 1} of ${msg.total} · round ${msg.round}`;
   el.qText.textContent = msg.text;
   el.qReveal.hidden = true;
@@ -165,7 +186,8 @@ function onRoundEnd(msg) {
 }
 
 function renderAnswered() {
-  el.qAnswers.textContent = state.round ? `${state.answered.size} / ${state.players} answers in` : "";
+  el.qAnswers.textContent = state.round && state.players
+    ? `${Math.min(state.answered.size, state.players)} / ${state.players} answers in` : "";
 }
 
 function startTimer() {
@@ -190,10 +212,19 @@ function stopTimer() {
 function startQuestion() {
   if (el.next.disabled) return;
   const msg = { type: "start_question" };
-  const limit = Number(el.timeLimit.value);
-  if (limit >= 3 && limit <= 120) msg.time_limit = limit;
+  const limit = clampLimit();
+  if (limit !== null) msg.time_limit = limit;
   el.next.disabled = true;
   send(msg);
+}
+
+function clampLimit() {
+  // What's in the box is what the round gets: clamp to the server's 3-120 s.
+  const v = Math.round(Number(el.timeLimit.value));
+  if (!Number.isFinite(v) || v <= 0) return null;
+  const limit = Math.min(120, Math.max(3, v));
+  el.timeLimit.value = limit;
+  return limit;
 }
 
 function endRound() {
@@ -204,10 +235,19 @@ function endRound() {
 
 // --- leaderboard and feed ------------------------------------------------------
 
-function renderBoard(rows) {
+function renderBoard(serverRows) {
+  // Once the game has started, players who left stay on the board (dimmed) at
+  // their last score, so the final standings survive the simulator exiting.
+  const here = new Set(serverRows.map((p) => p.player_id));
+  if (!state.started) state.known.clear();
+  const gone = [...state.known.values()].filter((p) => !here.has(p.player_id)).map((p) => ({ ...p, gone: true }));
+  for (const p of serverRows) state.known.set(p.player_id, p);
+  const rows = serverRows.concat(gone)
+    .sort((a, b) => b.score - a.score || a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+  rows.forEach((p, i) => { p.rank = i && p.score === rows[i - 1].score ? rows[i - 1].rank : i + 1; });
   el.boardEmpty.hidden = rows.length > 0;
   const items = rows.slice(0, BOARD_MAX).map((p) => {
-    const li = make("li", p.rank <= 3 ? "top" : "");
+    const li = make("li", (p.rank <= 3 ? "top" : "") + (p.gone ? " gone" : ""));
     const name = make("span", "name", p.name);
     if (!p.simulated) name.append(make("span", "tag real", "phone"));
     li.append(make("span", "rank", p.rank), name, make("span", "delta", p.round_points ? `+${p.round_points}` : ""),
@@ -241,6 +281,7 @@ function addFeed(msg) {
 }
 
 function onStreamMetrics(msg) {
+  if (!state.round || msg.round !== state.round.number) return;  // late, from an older round
   state.live.push(msg);
   const lat = state.feedLat.get(`${msg.round}:${msg.player_id}`);
   if (lat) lat.textContent = secs(msg.answer_latency_s);
@@ -272,7 +313,7 @@ function onSummary(msg) {
     el.mApi.textContent = secs(s.api_latency_s.p50);
     el.mErrors.textContent = s.answers ? `${s.errors}/${s.answers}` : "–";
     el.mErrors.className = `v ${s.errors ? "bad" : s.answers ? "good" : ""}`;
-    el.mWer.textContent = s.mean_wer === null ? "–" : `${Math.round((1 - s.mean_wer) * 100)}%`;
+    el.mWer.textContent = s.mean_wer === null ? "–" : `${Math.round(Math.max(0, 1 - s.mean_wer) * 100)}%`;
   }
   const body = el.byStreams.querySelector("tbody");
   body.replaceChildren(...msg.by_streams.map((g) => {
@@ -293,6 +334,8 @@ async function pollHealth() {
       : "Transcribe: off";
     if (typeof t.open_streams === "number") {
       el.mStreams.textContent = t.open_streams;
+      el.mStreamsK.textContent = t.waiting_streams ? `streams open (server), ${t.waiting_streams} waiting`
+        : "streams open (server)";
     }
   } catch (e) {
     // server gone: the WebSocket close says so

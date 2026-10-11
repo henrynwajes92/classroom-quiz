@@ -23,7 +23,7 @@ or unrecognised answers score 0.
 |---|---|---|
 | `ws://<server>/ws/host` | host screen | Connecting **creates a room**. One host per room. When the host disconnects, the room closes. |
 | `ws://<server>/ws/play` | phones, simulator | First message must be `join`. One player per connection. |
-| `GET /health` | anyone | `{"ok": true, "rooms": 1, "players": 35, "transcribe": {"host": "demo.cobaltspeech.com", "stream_cap": 4, "open_streams": 12}}`; `open_streams` (Transcribe stream tasks now) only with the Transcribe bridge |
+| `GET /health` | anyone | `{"ok": true, "rooms": 1, "players": 35, "transcribe": {"host": "demo.cobaltspeech.com", "stream_cap": 4, "open_streams": 4, "waiting_streams": 0}}`; with the Transcribe bridge only: `open_streams` = streams connected or connecting to Transcribe now (all rooms), `waiting_streams` = waiting for a slot under the demo cap |
 | `GET /host` | browser | Host screen (`web/host.html`): opens `/ws/host`, so it creates a room |
 | `GET /join-info?room=KXQB` | host screen | `{"url": "https://….trycloudflare.com/play?room=KXQB", "https": true, "tunnel": true}`: the phone link, from `.tunnel_url` (`scripts/tunnel.sh`) or else this server's address |
 | `GET /join-qr.svg?room=KXQB` | host screen | QR code of that link |

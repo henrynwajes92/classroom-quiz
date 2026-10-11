@@ -106,6 +106,7 @@ def test_round_run_from_the_host_screen(browser):
             alice = Player(server, room, "Alice", simulated=False)
             sim = Player(server, room, "Sim-01", simulated=True)
             page.wait_for_function("document.getElementById('players').textContent === '2 players'")
+            page.wait_for_function("document.querySelectorAll('#board li').length === 2")  # listed before any score
 
             page.click("#btn-next")
             page.wait_for_function("document.getElementById('q-text').textContent.includes('capital of France')")
@@ -138,7 +139,15 @@ def test_round_run_from_the_host_screen(browser):
             assert page.locator("#btn-next").is_enabled()
             if os.environ.get("HOST_SCREENSHOT"):
                 page.screenshot(path=os.environ["HOST_SCREENSHOT"])
-            assert not errors, errors
+
+            page.keyboard.press("n")  # round 2: last round's answers and word accuracy are cleared
+            page.wait_for_function("document.getElementById('q-text').textContent.includes('Red Planet')")
+            assert page.locator("#feed li").count() == 0 and text(page, "#m-wer") == "–"
             alice.ws.close()
             sim.ws.close()
+            page.wait_for_function("document.getElementById('players').textContent === '0 players'")
+            page.wait_for_function("document.querySelectorAll('#board li.gone').length === 2")
+            assert page.locator("#board li").count() == 2  # standings stay up (dimmed) after everyone left
+            assert text(page, "#q-answers") == ""
+            assert not errors, errors
             page.close()

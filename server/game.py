@@ -213,6 +213,7 @@ class Room:
         client.send({"type": "joined", "room": self.code, "player_id": player.id, "name": name})
         self.host.send({"type": "player_joined", "player_id": player.id, "name": name,
                         "count": len(self.players)})
+        self.host.send(self.leaderboard_msg())  # host screen lists players as they join
         if self.round and self.round.open:
             client.send(self.question_msg(self.round))
         log.info("room %s: %s joined (%d players)", self.code, name, len(self.players))

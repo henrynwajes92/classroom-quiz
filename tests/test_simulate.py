@@ -235,7 +235,7 @@ def test_health_reports_transcribe():
     assert LoggingBridge().status() == {"host": None, "stream_cap": None}
     assert TranscribeBridge(url=DEMO).status()["host"] == "demo.cobaltspeech.com"
     assert TranscribeBridge(url="ws://127.0.0.1:9/x").status() == {"host": "127.0.0.1", "stream_cap": None,
-                                                                     "open_streams": 0}
+                                                                     "open_streams": 0, "waiting_streams": 0}
 
 
 def test_server_status_from_health(server):
